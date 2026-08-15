@@ -1,5 +1,9 @@
 # Two-Tone Signal Sampling, Sinc Reconstruction & Aliasing DSP Suite 🌊
 
+[![Live Demo](https://img.shields.io/badge/Live_Demo-GitHub_Pages-00f2fe?style=for-the-badge&logo=github)](https://subhankar-06.github.io/two-tone-signal-sampling-dsp/)
+
+🌐 **Live Web Application**: [https://subhankar-06.github.io/two-tone-signal-sampling-dsp/](https://subhankar-06.github.io/two-tone-signal-sampling-dsp/)
+
 An interactive Web Studio and Python DSP simulation suite designed for Digital Communication courses to demonstrate and verify the **Whittaker-Shannon Sampling Theorem**, **Sinc Interpolation**, and **Aliasing Dynamics** for a two-tone signal:
 
 $$x(t) = A_1 \sin(2\pi f_1 t) + A_2 \sin(2\pi f_2 t)$$
