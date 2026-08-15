@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sampling Theorem & Sinc Reconstruction DSP Suite | Digital Communication Lab</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- Chart.js for smooth high-performance interactive graphing -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Top Navigation Header -->
+        <header class="main-header">
+            <div class="brand">
+                <div class="logo-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M2 12h3l3-9 4 18 3-9h3"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h1>Sampling & Reconstruction Studio</h1>
+                    <p class="subtitle">Digital Communication Lab &bull; Two-Tone Sinc Interpolation & Aliasing Simulator</p>
+                </div>
+            </div>
+
+            <!-- Quick Presets -->
+            <div class="preset-group">
+                <span class="preset-label">Sampling Regimes:</span>
+                <button class="preset-btn active" id="preset-above" onclick="setPreset('above')">
+                    <span class="dot green"></span> Above Nyquist (fs = 36 Hz)
+                </button>
+                <button class="preset-btn" id="preset-at" onclick="setPreset('at')">
+                    <span class="dot yellow"></span> At Nyquist (fs = 24 Hz)
+                </button>
+                <button class="preset-btn" id="preset-below" onclick="setPreset('below')">
+                    <span class="dot red"></span> Below Nyquist (fs = 14 Hz)
+                </button>
+            </div>
+
+            <!-- Runnable Wave & Audio Toolbar -->
+            <div class="playback-toolbar">
+                <button class="action-btn play-btn" id="btn-play-wave" onclick="toggleWaveAnimation()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    <span id="lbl-play-wave">Run Wave</span>
+                </button>
+                <button class="action-btn audio-btn" id="btn-audio-ref" onclick="toggleAudio('ref')">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                    <span>Listen Ref</span>
+                </button>
+                <button class="action-btn audio-btn recon" id="btn-audio-recon" onclick="toggleAudio('recon')">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                    <span>Listen Recon</span>
+                </button>
+            </div>
+
+            <!-- View Switcher -->
+            <div class="view-tabs">
+                <button class="tab-btn active" id="tab-sandbox" onclick="switchTab('sandbox')">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+                    Interactive Sandbox
+                </button>
+                <button class="tab-btn" id="tab-compare" onclick="switchTab('compare')">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="7" height="18" x="3" y="3" rx="1"/><rect width="7" height="18" x="14" y="3" rx="1"/></svg>
+                    3-Case Matrix
+                </button>
+                <button class="tab-btn" id="tab-code" onclick="switchTab('code')">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                    Python Script
+                </button>
+            </div>
+        </header>
+
+        <!-- MAIN VIEW: SANDBOX -->
+        <main id="view-sandbox" class="tab-content active">
+            <!-- Sidebar Controls -->
+            <aside class="sidebar-panel">
+                <div class="panel-header">
+                    <h2>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                        Signal & Sampling Parameters
+                    </h2>
+                </div>
+
+                <div class="control-group">
+                    <div class="group-title">Two-Tone Signal Definition: x(t) = A₁ sin(2πf₁t) + A₂ sin(2πf₂t)</div>
+                    
+                    <div class="control-item">
+                        <div class="control-label">
+                            <span>Tone 1 Frequency (f₁)</span>
+                            <span class="value-badge" id="val-f1">5.0 Hz</span>
+                        </div>
+                        <input type="range" id="slider-f1" min="1" max="20" step="0.5" value="5">
+                    </div>
+
+                    <div class="control-item">
+                        <div class="control-label">
+                            <span>Tone 1 Amplitude (A₁)</span>
+                            <span class="value-badge" id="val-a1">1.0</span>
+                        </div>
+                        <input type="range" id="slider-a1" min="0.1" max="2.0" step="0.1" value="1.0">
+                    </div>
+
+                    <div class="control-item">
+                        <div class="control-label">
+                            <span>Tone 2 Frequency (f₂)</span>
+                            <span class="value-badge" id="val-f2">12.0 Hz</span>
+                        </div>
+                        <input type="range" id="slider-f2" min="2" max="30" step="0.5" value="12">
+                    </div>
+
+                    <div class="control-item">
+                        <div class="control-label">
+                            <span>Tone 2 Amplitude (A₂)</span>
+                            <span class="value-badge" id="val-a2">0.5</span>
+                        </div>
+                        <input type="range" id="slider-a2" min="0.1" max="2.0" step="0.1" value="0.5">
+                    </div>
+                </div>
+
+                <div class="control-group highlighted">
+                    <div class="group-title">⚡ Physical Sampling Settings</div>
+                    
+                    <div class="control-item">
+                        <div class="control-label">
+                            <span>Physical Sampling Rate (fₛ)</span>
+                            <span class="value-badge highlight" id="val-fs">36.0 Hz</span>
+                        </div>
+                        <input type="range" id="slider-fs" min="4" max="60" step="0.5" value="36">
+                        <div class="slider-subtext">Nyquist Rate 2fₘₐₓ = <strong id="val-2fmax">24.0 Hz</strong></div>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <div class="group-title">🖥️ Plotting & Animation Settings</div>
+                    
+                    <div class="control-item">
+                        <div class="control-label">
+                            <span>Wave Travel Speed</span>
+                            <span class="value-badge" id="val-anim-speed">1.0×</span>
+                        </div>
+                        <input type="range" id="slider-anim-speed" min="0.1" max="3.0" step="0.1" value="1.0">
+                    </div>
+
+                    <div class="control-item">
+                        <div class="control-label">
+                            <span>Plotting Grid Resolution (fₚₗₒₜ)</span>
+                            <span class="value-badge" id="val-fplot">2000 Hz</span>
+                        </div>
+                        <input type="range" id="slider-fplot" min="500" max="4000" step="250" value="2000">
+                        <div class="slider-subtext">Simulates continuous-time analog signal</div>
+                    </div>
+
+                    <div class="control-item">
+                        <div class="control-label">
+                            <span>Time Window Duration (T)</span>
+                            <span class="value-badge" id="val-twindow">1.0 s</span>
+                        </div>
+                        <input type="range" id="slider-twindow" min="0.5" max="2.5" step="0.1" value="1.0">
+                    </div>
+
+                    <div class="control-item checkbox-item">
+                        <label class="checkbox-container">
+                            <input type="checkbox" id="chk-sinc-pulses">
+                            <span class="checkmark"></span>
+                            Show Individual Sinc Basis Pulses x[n]·sinc()
+                        </label>
+                    </div>
+
+                    <div class="control-item checkbox-item">
+                        <label class="checkbox-container">
+                            <input type="checkbox" id="chk-stem-lines" checked>
+                            <span class="checkmark"></span>
+                            Show Sample Stem Drop Lines
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Calculated Metrics Card -->
+                <div class="metrics-card">
+                    <h3>DSP Diagnostic Metrics</h3>
+                    <div class="metrics-grid">
+                        <div class="metric-box">
+                            <span class="metric-title">Nyquist Status</span>
+                            <span class="metric-val" id="metric-status">Above Nyquist</span>
+                        </div>
+                        <div class="metric-box">
+                            <span class="metric-title">Sampling Ratio (fₛ / 2fₘₐₓ)</span>
+                            <span class="metric-val" id="metric-ratio">1.50×</span>
+                        </div>
+                        <div class="metric-box">
+                            <span class="metric-title">Reconstruction RMSE</span>
+                            <span class="metric-val" id="metric-rmse">0.0012</span>
+                        </div>
+                        <div class="metric-box">
+                            <span class="metric-title">Signal-to-Distortion (SDR)</span>
+                            <span class="metric-val" id="metric-sdr">42.5 dB</span>
+                        </div>
+                    </div>
+
+                    <div class="alias-card">
+                        <div class="alias-header">Folded / Aliased Frequencies in [0, fₛ/2]</div>
+                        <div class="alias-content" id="alias-details">
+                            Tone 1 (5 Hz): <strong>5.0 Hz</strong> (Unchanged)<br>
+                            Tone 2 (12 Hz): <strong>12.0 Hz</strong> (Unchanged)
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Dashboard Visualization Viewports -->
+            <section class="dashboard-panel">
+                <!-- Row 1: Time Domain Reference & Sampled Signals -->
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <div>
+                            <h3>1. Continuous Reference x(t) & Discrete Samples x[n]</h3>
+                            <p class="chart-desc">Reference signal sampled at physical rate fₛ = <span id="lbl-fs1">36</span> Hz (N = <span id="lbl-nsamples">36</span> samples)</p>
+                        </div>
+                        <div class="chart-legend-custom">
+                            <span class="legend-item"><span class="line-sample ref"></span> Reference x(t)</span>
+                            <span class="legend-item"><span class="marker-sample"></span> Samples x[n]</span>
+                        </div>
+                    </div>
+                    <div class="chart-viewport">
+                        <canvas id="chart-time-sampled"></canvas>
+                    </div>
+                </div>
+
+                <!-- Row 2: Reconstructed Waveform & Sinc Interpolation -->
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <div>
+                            <h3>2. Whittaker-Shannon Sinc Reconstructed Waveform xᵣ(t)</h3>
+                            <p class="chart-desc">Reconstruction formula: xᵣ(t) = ∑ x[n] sinc((t - nTₛ)/Tₛ) evaluated on continuous grid (fₚₗₒₜ = <span id="lbl-fplot">2000</span> Hz)</p>
+                        </div>
+                        <div class="chart-legend-custom">
+                            <span class="legend-item"><span class="line-sample ref"></span> Reference x(t)</span>
+                            <span class="legend-item"><span class="line-sample recon"></span> Reconstructed xᵣ(t)</span>
+                        </div>
+                    </div>
+                    <div class="chart-viewport">
+                        <canvas id="chart-time-recon"></canvas>
+                    </div>
+                </div>
+
+                <!-- Row 3 & 4 Grid: Frequency Spectra & Reconstruction Error -->
+                <div class="chart-row-split">
+                    <!-- Left: Frequency Spectra -->
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <div>
+                                <h3>3. Magnitude Spectra (Frequency Domain)</h3>
+                                <p class="chart-desc">FFT spectrum of Reference vs Reconstructed signal (Nyquist folding freq fₛ/2 = <span id="lbl-fs2">18</span> Hz)</p>
+                            </div>
+                        </div>
+                        <div class="chart-viewport">
+                            <canvas id="chart-freq-spectrum"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Right: Continuous Time Reconstruction Error -->
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <div>
+                                <h3>4. Reconstruction Error e(t) = x(t) - xᵣ(t)</h3>
+                                <p class="chart-desc">Difference between continuous reference and sinc-interpolated signal</p>
+                            </div>
+                        </div>
+                        <div class="chart-viewport">
+                            <canvas id="chart-error"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- VIEW 2: 3-CASE COMPARISON MATRIX -->
+        <main id="view-compare" class="tab-content">
+            <div class="compare-container">
+                <div class="compare-header">
+                    <h2>3-Case Sampling Theorem Comparative Analysis</h2>
+                    <p>Direct side-by-side comparison of the three fundamental sampling regimes for two-tone signal f₁ = 5 Hz, f₂ = 12 Hz (Nyquist Rate = 24 Hz)</p>
+                </div>
+
+                <div class="compare-matrix">
+                    <!-- Case 1: Above Nyquist -->
+                    <div class="matrix-card above">
+                        <div class="matrix-card-header">
+                            <span class="badge green">CASE 1: ABOVE NYQUIST</span>
+                            <h3>Over-Sampling (fₛ = 36 Hz)</h3>
+                            <p class="matrix-sub">fₛ > 2fₘₐₓ (Ratio: 1.50×)</p>
+                        </div>
+                        <div class="matrix-chart-container">
+                            <h4>Time Domain Reconstruction</h4>
+                            <canvas id="chart-compare-time-above"></canvas>
+                        </div>
+                        <div class="matrix-chart-container">
+                            <h4>Magnitude Spectrum</h4>
+                            <canvas id="chart-compare-freq-above"></canvas>
+                        </div>
+                        <div class="matrix-chart-container">
+                            <h4>Reconstruction Error e(t)</h4>
+                            <canvas id="chart-compare-err-above"></canvas>
+                        </div>
+                        <div class="matrix-summary">
+                            <ul>
+                                <li><strong>Aliasing:</strong> None ($f_1=5\text{Hz}, f_2=12\text{Hz}$ correctly preserved).</li>
+                                <li><strong>Reconstruction:</strong> Perfect Whittaker-Shannon sinc recovery.</li>
+                                <li><strong>RMSE:</strong> $\approx 0.001$ | <strong>SDR:</strong> $> 40 \text{ dB}$.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Case 2: At Nyquist -->
+                    <div class="matrix-card at">
+                        <div class="matrix-card-header">
+                            <span class="badge yellow">CASE 2: AT NYQUIST</span>
+                            <h3>Critical Sampling (fₛ = 24 Hz)</h3>
+                            <p class="matrix-sub">fₛ = 2fₘₐₓ (Ratio: 1.00×)</p>
+                        </div>
+                        <div class="matrix-chart-container">
+                            <h4>Time Domain Reconstruction</h4>
+                            <canvas id="chart-compare-time-at"></canvas>
+                        </div>
+                        <div class="matrix-chart-container">
+                            <h4>Magnitude Spectrum</h4>
+                            <canvas id="chart-compare-freq-at"></canvas>
+                        </div>
+                        <div class="matrix-chart-container">
+                            <h4>Reconstruction Error e(t)</h4>
+                            <canvas id="chart-compare-err-at"></canvas>
+                        </div>
+                        <div class="matrix-summary">
+                            <ul>
+                                <li><strong>Aliasing:</strong> Boundary case ($f_2=12\text{Hz}$ sits right at Nyquist limit $f_s/2=12\text{Hz}$).</li>
+                                <li><strong>Reconstruction:</strong> Exact under ideal zero-phase conditions.</li>
+                                <li><strong>RMSE:</strong> Low ($\approx 0.005$) | Sensitive to sampling phase.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Case 3: Below Nyquist -->
+                    <div class="matrix-card below">
+                        <div class="matrix-card-header">
+                            <span class="badge red">CASE 3: BELOW NYQUIST</span>
+                            <h3>Under-Sampling (fₛ = 14 Hz)</h3>
+                            <p class="matrix-sub">fₛ < 2fₘₐₓ (Ratio: 0.58×)</p>
+                        </div>
+                        <div class="matrix-chart-container">
+                            <h4>Time Domain Reconstruction</h4>
+                            <canvas id="chart-compare-time-below"></canvas>
+                        </div>
+                        <div class="matrix-chart-container">
+                            <h4>Magnitude Spectrum</h4>
+                            <canvas id="chart-compare-freq-below"></canvas>
+                        </div>
+                        <div class="matrix-chart-container">
+                            <h4>Reconstruction Error e(t)</h4>
+                            <canvas id="chart-compare-err-below"></canvas>
+                        </div>
+                        <div class="matrix-summary">
+                            <ul>
+                                <li><strong>Aliasing:</strong> Active! $f_2 = 12\text{ Hz}$ aliases to $|12 - 14| = \mathbf{2.0\text{ Hz}}$.</li>
+                                <li><strong>Reconstruction:</strong> Distorted (Reconstructs a false low-frequency component).</li>
+                                <li><strong>RMSE:</strong> High ($\approx 0.35$) | Severe distortion.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- VIEW 3: PYTHON CODE EXPORTER -->
+        <main id="view-code" class="tab-content">
+            <div class="code-container">
+                <div class="code-header">
+                    <div>
+                        <h2>Digital Communication Lab Python Script Generator</h2>
+                        <p>Standalone, fully-executable Python script using NumPy and Matplotlib that reproduces all 3 sampling cases, sinc interpolation, FFT magnitude spectra, and error metrics.</p>
+                    </div>
+                    <button class="btn-copy" onclick="copyPythonCode()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                        <span id="copy-status">Copy Python Script</span>
+                    </button>
+                </div>
+                <pre class="code-block"><code id="python-code-content"># Generating code...</code></pre>
+            </div>
+        </main>
+    </div>
+
+    <!-- Application Script -->
+    <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+# Python temporary files
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE / System
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
