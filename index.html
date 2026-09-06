@@ -3,242 +3,36 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Digital Communication Laboratory Suite | Quantization, PCM, DPCM & Delta Modulation</title>
-    <!-- Fonts & Icons -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500;600&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Custom CSS -->
+    <title>DPCM & Delta Modulation — Digital Communication Laboratory</title>
     <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
     <div class="app-container">
-        <!-- Top Header Navigation -->
-        <header class="app-header">
-            <div class="brand">
-                <i class="fa-solid fa-wave-square brand-icon"></i>
-                <div>
-                    <h1>Digital Communication Laboratory Suite 🌊</h1>
-                    <p class="subtitle">Unified DSP Simulation Platform — Uniform Quantization, PCM, First-Order DPCM & Delta Modulation</p>
-                </div>
+        <!-- Header -->
+        <header class="top-header">
+            <div class="header-content">
+                <div class="badge">DIGITAL COMMUNICATION LAB • EXPERIMENT 5</div>
+                <h1>Differential PCM & Delta Modulation Interactive Studio</h1>
+                <p class="subtitle">Linear Prediction Redundancy Reduction, Slope Overload Distortion, Granular Noise & Adaptive Delta Modulation</p>
             </div>
-            <div class="header-actions">
-                <button id="btn-audio-toggle" class="btn btn-audio">
-                    <i class="fa-solid fa-volume-high"></i> <span id="audio-btn-text">Synthesizer Off</span>
-                </button>
-                <a href="./dpcm_delta_modulation/README.md" target="_blank" class="btn btn-secondary">
-                    <i class="fa-solid fa-book"></i> DPCM Manual
+            <div class="header-badges" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <a href="./uniform_quantization_pcm/web/index.html" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); padding: 6px 12px; border-radius: 8px; font-size: 0.8rem; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+                    ⬅ PCM Studio
                 </a>
-                <a href="./uniform_quantization_pcm/README.md" target="_blank" class="btn btn-secondary">
-                    <i class="fa-solid fa-book"></i> PCM Manual
+                <a href="./README.md" target="_blank" style="background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); padding: 6px 12px; border-radius: 8px; font-size: 0.8rem; font-weight: 600; text-decoration: none;">
+                    📖 Lab Manual
                 </a>
+                <span class="status-badge" id="validation-status-badge">✅ Step Invariant Verified (±Δ)</span>
+                <span class="regime-badge" id="regime-badge">Optimal Tracking</span>
             </div>
         </header>
 
-        <!-- Suite Level Experiment Switcher Tabs -->
-        <nav class="suite-nav-container">
-            <button id="btn-exp-pcm" class="main-suite-tab active" onclick="switchSuiteExperiment('pcm')">
-                <i class="fa-solid fa-layer-group"></i> Exp 4: Uniform Quantization & PCM
-            </button>
-            <button id="btn-exp-dpcm" class="main-suite-tab" onclick="switchSuiteExperiment('dpcm')">
-                <i class="fa-solid fa-chart-line"></i> Exp 5: DPCM & Delta Modulation
-            </button>
-        </nav>
-
-        <!-- ================================================================= -->
-        <!-- WORKSPACE 1: UNIFORM QUANTIZATION & PCM STUDIO                     -->
-        <!-- ================================================================= -->
-        <div id="workspace-pcm" class="main-workspace-tab workspace-grid">
-            <!-- Sidebar Controls Panel -->
-            <aside class="control-panel card">
-                <div class="panel-header">
-                    <h2><i class="fa-solid fa-sliders"></i> PCM Parameters</h2>
-                    <button id="btn-reset" class="btn-icon" title="Reset Defaults"><i class="fa-solid fa-rotate-left"></i></button>
-                </div>
-
-                <!-- Control 1: Bit Depth n -->
-                <div class="control-group">
-                    <div class="control-label-val">
-                        <label for="slider-bits">Quantization Bit Depth (<i>n</i>):</label>
-                        <span id="val-bits" class="badge badge-primary">4 Bits</span>
-                    </div>
-                    <input type="range" id="slider-bits" min="2" max="8" step="1" value="4">
-                    <div class="scale-labels">
-                        <span>2 bits (L=4)</span>
-                        <span>4 bits (L=16)</span>
-                        <span>8 bits (L=256)</span>
-                    </div>
-                </div>
-
-                <!-- Control 2: Quantizer Mode -->
-                <div class="control-group">
-                    <label>Quantizer Partitioning:</label>
-                    <div class="toggle-btn-group">
-                        <button id="btn-mode-midrise" class="btn-toggle active" data-mode="midrise">Mid-Rise (Standard)</button>
-                        <button id="btn-mode-midtread" class="btn-toggle" data-mode="midtread">Mid-Tread</button>
-                    </div>
-                </div>
-
-                <!-- Control 3: Amplitude -->
-                <div class="control-group">
-                    <div class="control-label-val">
-                        <label for="slider-amplitude">Peak Amplitude (<i>A</i>):</label>
-                        <span id="val-amplitude" class="badge">1.00 V</span>
-                    </div>
-                    <input type="range" id="slider-amplitude" min="0.1" max="1.0" step="0.05" value="1.0">
-                </div>
-
-                <!-- Control 4: Frequency -->
-                <div class="control-group">
-                    <div class="control-label-val">
-                        <label for="slider-frequency">Frequency (<i>f</i>):</label>
-                        <span id="val-frequency" class="badge">1.00 Hz</span>
-                    </div>
-                    <input type="range" id="slider-frequency" min="0.5" max="5.0" step="0.5" value="1.0">
-                </div>
-
-                <!-- Control 5: Sampling Rate -->
-                <div class="control-group">
-                    <div class="control-label-val">
-                        <label for="slider-fs">Sampling Rate (<i>f<sub>s</sub></i>):</label>
-                        <span id="val-fs" class="badge">1000 Hz</span>
-                    </div>
-                    <input type="range" id="slider-fs" min="200" max="2000" step="100" value="1000">
-                </div>
-
-                <!-- Live Theoretical & Empirical Analytics Box -->
-                <div class="analytics-box">
-                    <h3><i class="fa-solid fa-square-root-variable"></i> Real-Time Analytics</h3>
-                    <div class="metric-row">
-                        <span>Levels <i>L = 2<sup>n</sup></i>:</span>
-                        <strong id="metric-levels">16</strong>
-                    </div>
-                    <div class="metric-row">
-                        <span>Step Size &Delta;:</span>
-                        <strong id="metric-step">0.12500 V</strong>
-                    </div>
-                    <div class="metric-row">
-                        <span>Measured MSE:</span>
-                        <strong id="metric-pcm-mse">0.001302</strong>
-                    </div>
-                    <div class="metric-row highlight">
-                        <span>Simulated SQNR:</span>
-                        <strong id="metric-pcm-sqnr">25.85 dB</strong>
-                    </div>
-                    <div class="metric-row">
-                        <span>Theoretical SQNR:</span>
-                        <strong id="metric-theory-sqnr">25.84 dB</strong>
-                    </div>
-                    <div class="metric-row">
-                        <span>Discrepancy (&Delta;):</span>
-                        <strong id="metric-sqnr-diff" class="text-success">+0.01 dB</strong>
-                    </div>
-                </div>
-            </aside>
-
-            <!-- Main Interactive Canvas & Visualization Area -->
-            <section class="display-panel">
-                <!-- Navigation Tabs for Canvases -->
-                <div class="tab-nav card">
-                    <button class="tab-btn active" data-target="tab-waveform">
-                        <i class="fa-solid fa-chart-line"></i> Analog vs. Quantized
-                    </button>
-                    <button class="tab-btn" data-target="tab-staircase">
-                        <i class="fa-solid fa-stairs"></i> Staircase Characteristic
-                    </button>
-                    <button class="tab-btn" data-target="tab-error">
-                        <i class="fa-solid fa-chart-column"></i> Error & Histogram
-                    </button>
-                    <button class="tab-btn" data-target="tab-sqnr">
-                        <i class="fa-solid fa-arrow-trend-up"></i> 6.02 dB/Bit Law
-                    </button>
-                </div>
-
-                <!-- Canvas Viewports Container -->
-                <div class="canvas-container card">
-                    <div class="tab-content-wrapper">
-                        <!-- Tab 1: Waveform Canvas -->
-                        <div id="tab-waveform" class="tab-pane active">
-                            <canvas id="canvas-waveform" width="900" height="420"></canvas>
-                            <div class="canvas-legend">
-                                <span><span class="legend-dot analog-line"></span> Original Analog Sinusoid x(t)</span>
-                                <span><span class="legend-dot quantized-line"></span> Quantized Staircase Waveform x_q(t)</span>
-                                <span><span class="legend-dot sample-point"></span> Discrete Sampler Stems</span>
-                            </div>
-                        </div>
-
-                        <!-- Tab 2: Staircase Characteristic Canvas -->
-                        <div id="tab-staircase" class="tab-pane">
-                            <canvas id="canvas-staircase" width="900" height="420"></canvas>
-                            <div class="canvas-legend">
-                                <span><span class="legend-dot theory-line"></span> Ideal Mid-Rise Quantization Characteristic</span>
-                                <span><span class="legend-dot sample-point"></span> Operating Points</span>
-                            </div>
-                        </div>
-
-                        <!-- Tab 3: Error & Histogram Canvas -->
-                        <div id="tab-error" class="tab-pane">
-                            <div class="dual-canvas-grid">
-                                <div>
-                                    <h4 class="subpanel-title">Quantization Error Waveform e(t) = x(t) - x_q(t)</h4>
-                                    <canvas id="canvas-error-wave" width="440" height="370"></canvas>
-                                </div>
-                                <div>
-                                    <h4 class="subpanel-title">Error Histogram vs Ideal Uniform PDF U[-&Delta;/2, +&Delta;/2]</h4>
-                                    <canvas id="canvas-error-hist" width="440" height="370"></canvas>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Tab 4: SQNR vs Bits Canvas -->
-                        <div id="tab-sqnr" class="tab-pane">
-                            <canvas id="canvas-sqnr" width="900" height="420"></canvas>
-                            <div class="canvas-legend">
-                                <span><span class="legend-dot sim-line"></span> Simulated SQNR (dB)</span>
-                                <span><span class="legend-dot theory-line"></span> Theoretical Line (6.02n + 1.76 dB)</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- PCM Binary Inspector Table Card -->
-                <div class="pcm-inspector-card card">
-                    <div class="card-header-flex">
-                        <h3><i class="fa-solid fa-code"></i> Live PCM Binary Bitstream Inspector</h3>
-                        <span class="badge badge-info">First 16 Time Samples</span>
-                    </div>
-                    <div class="table-responsive">
-                        <table class="pcm-table">
-                            <thead>
-                                <tr>
-                                    <th>Sample # (k)</th>
-                                    <th>Time (ms)</th>
-                                    <th>Analog Value x(t)</th>
-                                    <th>Quantized Index (i)</th>
-                                    <th>PCM Binary Word</th>
-                                    <th>Quantized Value x_q(t)</th>
-                                    <th>Error e[k]</th>
-                                </tr>
-                            </thead>
-                            <tbody id="pcm-table-body">
-                                <!-- Dynamic rows generated by app.js -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </section>
-        </div>
-
-        <!-- ================================================================= -->
-        <!-- WORKSPACE 2: DPCM & DELTA MODULATION STUDIO                       -->
-        <!-- ================================================================= -->
-        <div id="workspace-dpcm" class="main-workspace-tab dashboard-grid" style="display: none;">
+        <!-- Main Workspace Grid -->
+        <main class="dashboard-grid">
             <!-- Sidebar: Simulation Controls -->
             <aside class="control-panel card">
-                <div class="panel-header">
-                    <h2><i class="fa-solid fa-sliders"></i> DPCM & DM Controls</h2>
-                </div>
+                <h2>Simulation Controls</h2>
 
                 <!-- Mode Selector Tabs -->
                 <div class="tab-group">
@@ -291,7 +85,7 @@
 
                     <div class="control-row checkbox-row">
                         <label class="toggle-switch">
-                            <input type="checkbox" id="toggle-adm" onchange="updateDPCMSimulation()">
+                            <input type="checkbox" id="toggle-adm" onchange="updateSimulation()">
                             <span class="slider round"></span>
                         </label>
                         <span class="toggle-label">Enable Adaptive DM (ADM - Song/Jayant)</span>
@@ -323,7 +117,7 @@
 
                 <!-- Run / Reset -->
                 <div class="btn-actions">
-                    <button class="btn btn-primary" onclick="updateDPCMSimulation()">Recompute Simulation</button>
+                    <button class="btn btn-primary" onclick="updateSimulation()">Recompute Simulation</button>
                     <button class="btn btn-secondary" onclick="resetDefaults()">Reset Defaults</button>
                 </div>
             </aside>
@@ -399,39 +193,9 @@
                     </div>
                 </div>
             </section>
-        </div>
-
-        <!-- Footer -->
-        <footer class="app-footer">
-            <p>Digital Communication Laboratory Suite — Uniform Quantization, PCM, DPCM & Delta Modulation | Built with HTML5 Canvas & Web Audio API</p>
-        </footer>
+        </main>
     </div>
 
-    <!-- Application Scripts -->
     <script src="app.js"></script>
-    <script src="dpcm_app.js"></script>
-    <script>
-        function switchSuiteExperiment(exp) {
-            const pcmTab = document.getElementById('btn-exp-pcm');
-            const dpcmTab = document.getElementById('btn-exp-dpcm');
-            const pcmWs = document.getElementById('workspace-pcm');
-            const dpcmWs = document.getElementById('workspace-dpcm');
-
-            if (exp === 'pcm') {
-                pcmTab.classList.add('active');
-                dpcmTab.classList.remove('active');
-                pcmWs.style.display = 'grid';
-                dpcmWs.style.display = 'none';
-            } else {
-                dpcmTab.classList.add('active');
-                pcmTab.classList.remove('active');
-                pcmWs.style.display = 'none';
-                dpcmWs.style.display = 'grid';
-                if (typeof window.updateDPCMSimulation === 'function') {
-                    window.updateDPCMSimulation();
-                }
-            }
-        }
-    </script>
 </body>
 </html>

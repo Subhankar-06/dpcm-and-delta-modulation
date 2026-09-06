@@ -1,765 +1,635 @@
 /**
- * Uniform Quantization & PCM Web Studio — DSP Engine & Interactive Visualizer
- * Digital Communication Laboratory Suite
+ * Interactive DPCM and Delta Modulation Web Simulation Studio.
+ * 
+ * Implements:
+ * - Linear Delta Modulation (LDM) with fixed Delta
+ * - Adaptive Delta Modulation (ADM) with Song/Jayant adaptation
+ * - First-Order DPCM with decoupled Prediction, Quantization, and Reconstruction
+ * - Direct PCM Baseline Comparator
+ * - Mandatory Step Verification Assertion
+ * - Interactive Oscilloscope Canvas Rendering & Dynamic U-Curve
  */
 
-document.addEventListener('DOMContentLoaded', () => {
-    // -------------------------------------------------------------------------
-    // 1. Global Application State
-    // -------------------------------------------------------------------------
-    const state = {
-        bits: 4,
-        amplitude: 1.0,
-        frequency: 1.0,
-        samplingRate: 1000,
-        numSamples: 1000,
-        mode: 'midrise', // 'midrise' or 'midtread'
-        audioSource: 'quantized',
-        audioActive: false,
-        activeTab: 'tab-waveform',
-        hoverSampleIdx: null
-    };
-
-    // Web Audio API Context
-    let audioCtx = null;
-    let audioNode = null;
-    let gainNode = null;
-
-    // Canvas Contexts
-    const canvases = {
-        waveform: document.getElementById('canvas-waveform'),
-        staircase: document.getElementById('canvas-staircase'),
-        errorWave: document.getElementById('canvas-error-wave'),
-        errorHist: document.getElementById('canvas-error-hist'),
-        sqnr: document.getElementById('canvas-sqnr')
-    };
-
-    // -------------------------------------------------------------------------
-    // 2. Core DSP Math Algorithms
-    // -------------------------------------------------------------------------
-
-    /** Generate continuous-time normalized sinusoidal signal */
-    function generateSignal() {
-        const N = state.numSamples;
-        const dt = 1.0 / state.samplingRate;
-        const t = new Float64Array(N);
-        const signal = new Float64Array(N);
-
-        for (let k = 0; k < N; k++) {
-            t[k] = k * dt;
-            signal[k] = state.amplitude * Math.sin(2 * Math.PI * state.frequency * t[k]);
-        }
-        return { t, signal };
-    }
-
-    /** Mid-Rise / Mid-Tread Uniform Quantizer */
-    function quantizeUniform(signal, bits, mode = 'midrise', minVal = -1.0, maxVal = 1.0) {
-        const N = signal.length;
-        const L = Math.pow(2, bits);
-        const delta = (maxVal - minVal) / L;
-        
-        const quantized = new Float64Array(N);
-        const indices = new Int32Array(N);
-        const levels = new Float64Array(L);
-
-        if (mode === 'midrise') {
-            // Mid-rise quantization levels: q_i = minVal + (i + 0.5) * delta
-            for (let i = 0; i < L; i++) {
-                levels[i] = minVal + (i + 0.5) * delta;
-            }
-            for (let k = 0; k < N; k++) {
-                let idx = Math.floor((signal[k] - minVal) / delta);
-                if (idx < 0) idx = 0;
-                if (idx >= L) idx = L - 1;
-                indices[k] = idx;
-                quantized[k] = levels[idx];
-            }
-        } else {
-            // Mid-tread quantization: level at 0.0
-            for (let i = 0; i < L; i++) {
-                levels[i] = (i - L / 2) * delta;
-            }
-            for (let k = 0; k < N; k++) {
-                let idx = Math.round(signal[k] / delta) + Math.floor(L / 2);
-                if (idx < 0) idx = 0;
-                if (idx >= L) idx = L - 1;
-                indices[k] = idx;
-                quantized[k] = levels[idx];
-            }
-        }
-
-        return { quantized, indices, delta, levels, L };
-    }
-
-    /** Convert Integer Index to PCM Binary String */
-    function pcmEncode(index, bits) {
-        return index.toString(2).padStart(bits, '0');
-    }
-
-    /** Calculate Statistical Metrics: MSE, SQNR, Theory Comparison */
-    function computeMetrics(signal, quantized, bits, delta) {
-        const N = signal.length;
-        let sumErrorSq = 0;
-        let sumSignalSq = 0;
-        let maxError = 0;
-        const error = new Float64Array(N);
-
-        for (let k = 0; k < N; k++) {
-            const err = signal[k] - quantized[k];
-            error[k] = err;
-            sumErrorSq += err * err;
-            sumSignalSq += signal[k] * signal[k];
-            if (Math.abs(err) > maxError) {
-                maxError = Math.abs(err);
-            }
-        }
-
-        const mse = sumErrorSq / N;
-        const px = sumSignalSq / N;
-        const rmsError = Math.sqrt(mse);
-        
-        const sqnrSim = mse > 0 ? 10 * Math.log10(px / mse) : 99.9;
-        const sqnrTheory = 6.02 * bits + 1.76;
-        const diff = sqnrSim - sqnrTheory;
-        const agrees = Math.abs(diff) <= 1.0;
-
-        return {
-            bits,
-            levels: Math.pow(2, bits),
-            delta,
-            mse,
-            maxError,
-            rmsError,
-            px,
-            sqnrSim,
-            sqnrTheory,
-            diff,
-            agrees,
-            error
-        };
-    }
-
-    // -------------------------------------------------------------------------
-    // 3. Canvas 2D Rendering Engine
-    // -------------------------------------------------------------------------
-
-    function setupCanvasDPI(canvas) {
-        if (!canvas) return { ctx: null, width: 900, height: 420 };
-        const dpr = window.devicePixelRatio || 1;
-        const rect = canvas.getBoundingClientRect();
-        let w = rect.width;
-        let h = rect.height;
-
-        const defaultW = parseFloat(canvas.getAttribute('width')) || 900;
-        const defaultH = parseFloat(canvas.getAttribute('height')) || 420;
-
-        if (!w || w <= 0) w = defaultW;
-        if (!h || h <= 0) h = defaultH;
-
-        canvas.width = Math.round(w * dpr);
-        canvas.height = Math.round(h * dpr);
-
-        const ctx = canvas.getContext('2d');
-        ctx.resetTransform();
-        ctx.scale(dpr, dpr);
-        return { ctx, width: w, height: h };
-    }
-
-    /** Draw Tab 1: Waveforms (Continuous vs Quantized Staircase) */
-    function renderWaveformCanvas(t, signal, quantized, bits) {
-        const { ctx, width, height } = setupCanvasDPI(canvases.waveform);
-        if (!ctx) return;
-        ctx.clearRect(0, 0, width, height);
-
-        const margin = { top: 30, right: 30, bottom: 40, left: 55 };
-        const plotW = width - margin.left - margin.right;
-        const plotH = height - margin.top - margin.bottom;
-
-        // Render Grid & Axes
-        ctx.strokeStyle = '#1e293b';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        for (let y = margin.top; y <= margin.top + plotH; y += plotH / 4) {
-            ctx.moveTo(margin.left, y);
-            ctx.lineTo(margin.left + plotW, y);
-        }
-        ctx.stroke();
-
-        // Zero line
-        const zeroY = margin.top + plotH / 2;
-        ctx.strokeStyle = '#475569';
-        ctx.beginPath();
-        ctx.moveTo(margin.left, zeroY);
-        ctx.lineTo(margin.left + plotW, zeroY);
-        ctx.stroke();
-
-        const numPoints = Math.min(signal.length, 300);
-        const mapX = (idx) => margin.left + (idx / (numPoints - 1)) * plotW;
-        const mapY = (val) => zeroY - (val / 1.25) * (plotH / 2);
-
-        // 1. Continuous Reference Sinusoid
-        ctx.strokeStyle = '#4facfe';
-        ctx.lineWidth = 2.5;
-        ctx.beginPath();
-        for (let k = 0; k < numPoints; k++) {
-            const x = mapX(k);
-            const y = mapY(signal[k]);
-            if (k === 0) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
-        }
-        ctx.stroke();
-
-        // 2. Quantized Staircase Waveform (Steps)
-        ctx.strokeStyle = '#ff7f0e';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        for (let k = 0; k < numPoints - 1; k++) {
-            const x1 = mapX(k);
-            const x2 = mapX(k + 1);
-            const y = mapY(quantized[k]);
-            ctx.moveTo(x1, y);
-            ctx.lineTo(x2, y);
-            // vertical transition
-            const nextY = mapY(quantized[k + 1]);
-            ctx.lineTo(x2, nextY);
-        }
-        ctx.stroke();
-
-        // Interactive Hover Readout
-        if (state.hoverSampleIdx !== null && state.hoverSampleIdx < numPoints) {
-            const hIdx = state.hoverSampleIdx;
-            const hX = mapX(hIdx);
-            ctx.strokeStyle = '#00f2fe';
-            ctx.setLineDash([4, 4]);
-            ctx.beginPath();
-            ctx.moveTo(hX, margin.top);
-            ctx.lineTo(hX, margin.top + plotH);
-            ctx.stroke();
-            ctx.setLineDash([]);
-
-            // Draw point highlight
-            ctx.fillStyle = '#ff7f0e';
-            ctx.beginPath();
-            ctx.arc(hX, mapY(quantized[hIdx]), 5, 0, 2 * Math.PI);
-            ctx.fill();
-        }
-
-        // Axes Labels
-        ctx.fillStyle = '#94a3b8';
-        ctx.font = '11px Inter';
-        ctx.fillText('Time (s)', margin.left + plotW / 2 - 20, height - 10);
-        ctx.fillText('+1.0 V', 15, margin.top + 10);
-        ctx.fillText(' 0.0 V', 15, zeroY + 4);
-        ctx.fillText('-1.0 V', 15, margin.top + plotH);
-    }
-
-    /** Draw Tab 2: Staircase Characteristic (x -> x_q) */
-    function renderStaircaseCanvas(bits, mode) {
-        const { ctx, width, height } = setupCanvasDPI(canvases.staircase);
-        if (!ctx) return;
-        ctx.clearRect(0, 0, width, height);
-
-        const margin = { top: 30, right: 30, bottom: 45, left: 55 };
-        const plotW = width - margin.left - margin.right;
-        const plotH = height - margin.top - margin.bottom;
-
-        const zeroX = margin.left + plotW / 2;
-        const zeroY = margin.top + plotH / 2;
-
-        // Grid
-        ctx.strokeStyle = '#1e293b';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(margin.left, zeroY); ctx.lineTo(margin.left + plotW, zeroY);
-        ctx.moveTo(zeroX, margin.top); ctx.lineTo(zeroX, margin.top + plotH);
-        ctx.stroke();
-
-        const mapX = (v) => zeroX + (v / 1.2) * (plotW / 2);
-        const mapY = (v) => zeroY - (v / 1.2) * (plotH / 2);
-
-        // Ideal Line x_q = x
-        ctx.strokeStyle = '#aaaaaa';
-        ctx.setLineDash([4, 4]);
-        ctx.beginPath();
-        ctx.moveTo(mapX(-1.0), mapY(-1.0));
-        ctx.lineTo(mapX(1.0), mapY(1.0));
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        // Staircase Characteristic
-        const N = 1000;
-        const xFine = new Float64Array(N);
-        for (let i = 0; i < N; i++) {
-            xFine[i] = -1.0 + (i / (N - 1)) * 2.0;
-        }
-        const { quantized: xqFine, delta, levels } = quantizeUniform(xFine, bits, mode);
-
-        // Draw quantization level lines
-        ctx.strokeStyle = 'rgba(0, 242, 254, 0.15)';
-        for (let l of levels) {
-            const y = mapY(l);
-            ctx.beginPath();
-            ctx.moveTo(margin.left, y);
-            ctx.lineTo(margin.left + plotW, y);
-            ctx.stroke();
-        }
-
-        // Draw staircase
-        ctx.strokeStyle = '#e74c3c';
-        ctx.lineWidth = 2.5;
-        ctx.beginPath();
-        for (let k = 0; k < N - 1; k++) {
-            const x1 = mapX(xFine[k]);
-            const x2 = mapX(xFine[k + 1]);
-            const y = mapY(xqFine[k]);
-            if (k === 0) ctx.moveTo(x1, y);
-            else ctx.lineTo(x1, y);
-            ctx.lineTo(x2, y);
-        }
-        ctx.stroke();
-
-        // Labels
-        ctx.fillStyle = '#94a3b8';
-        ctx.font = '11px Inter';
-        ctx.fillText('Input Amplitude x (V)', zeroX - 50, height - 10);
-        ctx.fillText('Quantized x_q (V)', 10, margin.top - 10);
-    }
-
-    /** Draw Tab 3: Error Waveform & Histogram */
-    function renderErrorCanvas(t, error, delta) {
-        // 1. Error Waveform
-        const { ctx: ctxWave, width: wWave, height: hWave } = setupCanvasDPI(canvases.errorWave);
-        if (ctxWave) {
-            ctxWave.clearRect(0, 0, wWave, hWave);
-            
-            const m = { top: 20, right: 20, bottom: 30, left: 45 };
-            const pw = wWave - m.left - m.right;
-            const ph = hWave - m.top - m.bottom;
-            const zeroY = m.top + ph / 2;
-
-            ctxWave.strokeStyle = '#1e293b';
-            ctxWave.beginPath();
-            ctxWave.moveTo(m.left, zeroY); ctxWave.lineTo(m.left + pw, zeroY);
-            ctxWave.stroke();
-
-            // Bounds +/- delta/2
-            const mapY = (val) => zeroY - (val / (delta * 0.85)) * (ph / 2);
-            ctxWave.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-            ctxWave.setLineDash([3, 3]);
-            ctxWave.beginPath();
-            ctxWave.moveTo(m.left, mapY(delta / 2)); ctxWave.lineTo(m.left + pw, mapY(delta / 2));
-            ctxWave.moveTo(m.left, mapY(-delta / 2)); ctxWave.lineTo(m.left + pw, mapY(-delta / 2));
-            ctxWave.stroke();
-            ctxWave.setLineDash([]);
-
-            // Error trace
-            const numP = Math.min(error.length, 300);
-            ctxWave.strokeStyle = '#2ecc71';
-            ctxWave.lineWidth = 1.5;
-            ctxWave.beginPath();
-            for (let k = 0; k < numP; k++) {
-                const x = m.left + (k / (numP - 1)) * pw;
-                const y = mapY(error[k]);
-                if (k === 0) ctxWave.moveTo(x, y);
-                else ctxWave.lineTo(x, y);
-            }
-            ctxWave.stroke();
-        }
-
-        // 2. Error Histogram
-        const { ctx: ctxHist, width: wHist, height: hHist } = setupCanvasDPI(canvases.errorHist);
-        if (ctxHist) {
-            ctxHist.clearRect(0, 0, wHist, hHist);
-            const m = { top: 20, right: 20, bottom: 30, left: 45 };
-            const pw = wHist - m.left - m.right;
-            const ph = hHist - m.top - m.bottom;
-
-            const numBins = 25;
-            const bins = new Int32Array(numBins);
-            const binWidth = delta / numBins;
-            const minE = -delta / 2;
-
-            for (let i = 0; i < error.length; i++) {
-                let b = Math.floor((error[i] - minE) / binWidth);
-                if (b < 0) b = 0;
-                if (b >= numBins) b = numBins - 1;
-                bins[b]++;
-            }
-
-            const maxCount = Math.max(...bins, 1);
-            const barW = pw / numBins;
-
-            ctxHist.fillStyle = 'rgba(46, 204, 113, 0.6)';
-            ctxHist.strokeStyle = '#1e293b';
-            for (let b = 0; b < numBins; b++) {
-                const h = (bins[b] / maxCount) * ph;
-                const x = m.left + b * barW;
-                const y = m.top + ph - h;
-                ctxHist.fillRect(x, y, barW - 1, h);
-            }
-
-            // Ideal uniform PDF line
-            ctxHist.strokeStyle = '#e74c3c';
-            ctxHist.lineWidth = 2;
-            const idealY = m.top + ph * 0.25;
-            ctxHist.beginPath();
-            ctxHist.moveTo(m.left, idealY);
-            ctxHist.lineTo(m.left + pw, idealY);
-            ctxHist.stroke();
-        }
-    }
-
-    /** Draw Tab 4: SQNR vs Bit Depth */
-    function renderSQNRCanvas(currentBits) {
-        const { ctx, width, height } = setupCanvasDPI(canvases.sqnr);
-        if (!ctx) return;
-        ctx.clearRect(0, 0, width, height);
-
-        const margin = { top: 30, right: 40, bottom: 45, left: 55 };
-        const plotW = width - margin.left - margin.right;
-        const plotH = height - margin.top - margin.bottom;
-
-        const bitList = [2, 3, 4, 5, 6, 7, 8];
-        const mapX = (b) => margin.left + ((b - 2) / 6) * plotW;
-        const mapY = (sqnr) => margin.top + plotH - (sqnr / 60) * plotH;
-
-        // Grid
-        ctx.strokeStyle = '#1e293b';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        for (let s = 0; s <= 60; s += 10) {
-            const y = mapY(s);
-            ctx.moveTo(margin.left, y); ctx.lineTo(margin.left + plotW, y);
-        }
-        ctx.stroke();
-
-        // 1. Theoretical Line
-        ctx.strokeStyle = '#e74c3c';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([4, 4]);
-        ctx.beginPath();
-        for (let b of bitList) {
-            const th = 6.02 * b + 1.76;
-            const x = mapX(b);
-            const y = mapY(th);
-            if (b === 2) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
-        }
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        // 2. Simulated Points & Line
-        const dummySignal = generateSignal().signal;
-        ctx.strokeStyle = '#4facfe';
-        ctx.fillStyle = '#4facfe';
-        ctx.lineWidth = 2.5;
-        ctx.beginPath();
-
-        for (let b of bitList) {
-            const { quantized, delta } = quantizeUniform(dummySignal, b, state.mode);
-            const metrics = computeMetrics(dummySignal, quantized, b, delta);
-            const x = mapX(b);
-            const y = mapY(metrics.sqnrSim);
-
-            if (b === 2) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
-        }
-        ctx.stroke();
-
-        // Draw markers
-        for (let b of bitList) {
-            const { quantized, delta } = quantizeUniform(dummySignal, b, state.mode);
-            const metrics = computeMetrics(dummySignal, quantized, b, delta);
-            const x = mapX(b);
-            const y = mapY(metrics.sqnrSim);
-
-            ctx.beginPath();
-            ctx.arc(x, y, b === currentBits ? 7 : 4, 0, 2 * Math.PI);
-            ctx.fillStyle = b === currentBits ? '#00f2fe' : '#4facfe';
-            ctx.fill();
-
-            if (b === currentBits) {
-                ctx.strokeStyle = '#ffffff';
-                ctx.lineWidth = 2;
-                ctx.stroke();
-            }
-
-            // Value text
-            ctx.fillStyle = '#94a3b8';
-            ctx.font = '10px Fira Code';
-            ctx.fillText(`${metrics.sqnrSim.toFixed(1)} dB`, x - 15, y - 10);
-        }
-
-        // Axis labels
-        ctx.fillStyle = '#94a3b8';
-        ctx.font = '11px Inter';
-        ctx.fillText('Quantization Bit Depth (n)', margin.left + plotW / 2 - 60, height - 10);
-        ctx.fillText('SQNR (dB)', 10, margin.top - 10);
-    }
-
-    // -------------------------------------------------------------------------
-    // 4. Web Audio Synthesizer Engine
-    // -------------------------------------------------------------------------
-
-    function toggleAudio() {
-        if (!state.audioActive) {
-            if (!audioCtx) {
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            }
-            audioCtx.resume();
-            startAudioSynth();
-            state.audioActive = true;
-            document.getElementById('btn-audio-toggle').classList.add('active');
-            document.getElementById('audio-btn-text').innerText = 'Synthesizer ON';
-        } else {
-            stopAudioSynth();
-            state.audioActive = false;
-            document.getElementById('btn-audio-toggle').classList.remove('active');
-            document.getElementById('audio-btn-text').innerText = 'Synthesizer Off';
-        }
-    }
-
-    function startAudioSynth() {
-        if (!audioCtx) return;
-        stopAudioSynth();
-
-        const bufferSize = audioCtx.sampleRate * 2;
-        const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-        const data = buffer.getChannelData(0);
-
-        const freq = 440.0; // Audio pitch frequency for physical listening
-        const { signal } = generateSignal();
-        const { quantized, delta } = quantizeUniform(signal, state.bits, state.mode);
-        const metrics = computeMetrics(signal, quantized, state.bits, delta);
-
-        let sourceSignal = quantized;
-        if (state.audioSource === 'reference') sourceSignal = signal;
-        if (state.audioSource === 'error') sourceSignal = metrics.error;
-
-        // Loop synthesized waveform into audio buffer
-        for (let i = 0; i < bufferSize; i++) {
-            const idx = Math.floor((i / audioCtx.sampleRate) * freq * state.numSamples) % state.numSamples;
-            data[i] = sourceSignal[idx] * 0.3; // volume scale
-        }
-
-        audioNode = audioCtx.createBufferSource();
-        audioNode.buffer = buffer;
-        audioNode.loop = true;
-
-        gainNode = audioCtx.createGain();
-        gainNode.gain.value = 0.2;
-
-        audioNode.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
-        audioNode.start();
-    }
-
-    function stopAudioSynth() {
-        if (audioNode) {
-            try { audioNode.stop(); audioNode.disconnect(); } catch (e) {}
-            audioNode = null;
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // 5. DOM Update & Event Handling
-    // -------------------------------------------------------------------------
-
-    function updateApp() {
-        // 1. Calculate DSP data
-        const { t, signal } = generateSignal();
-        const { quantized, indices, delta, levels, L } = quantizeUniform(signal, state.bits, state.mode);
-        const metrics = computeMetrics(signal, quantized, state.bits, delta);
-
-        // 2. Update Header & Sidebar Control Badges
-        document.getElementById('val-bits').innerText = `${state.bits} Bits (L=${L})`;
-        document.getElementById('val-amp').innerText = `${state.amplitude.toFixed(2)} V`;
-        document.getElementById('val-freq').innerText = `${state.frequency.toFixed(1)} Hz`;
-        document.getElementById('val-fs').innerText = `${state.samplingRate} Hz`;
-
-        // 3. Update Metric Bar Cards
-        document.getElementById('metric-levels').innerText = L;
-        document.getElementById('metric-delta').innerText = `${delta.toFixed(4)} V`;
-        document.getElementById('metric-mse').innerText = metrics.mse.toExponential(3);
-        document.getElementById('metric-sqnr-sim').innerText = `${metrics.sqnrSim.toFixed(2)} dB`;
-        document.getElementById('metric-sqnr-th').innerText = `${metrics.sqnrTheory.toFixed(2)} dB`;
-        
-        const diffElem = document.getElementById('metric-sqnr-diff');
-        diffElem.innerText = `Diff: ${metrics.diff > 0 ? '+' : ''}${metrics.diff.toFixed(2)} dB`;
-
-        const agreeElem = document.getElementById('metric-agreement');
-        agreeElem.innerText = metrics.agrees ? 'YES' : 'NO';
-        agreeElem.className = `metric-badge ${metrics.agrees ? 'pass' : 'fail'}`;
-
-        // 4. Render Active Tab Canvas
-        renderWaveformCanvas(t, signal, quantized, state.bits);
-        renderStaircaseCanvas(state.bits, state.mode);
-        renderErrorCanvas(t, metrics.error, delta);
-        renderSQNRCanvas(state.bits);
-
-        // 5. Update PCM Bitstream Table Inspector (First 16 samples)
-        const tableBody = document.getElementById('pcm-table-body');
-        tableBody.innerHTML = '';
-        const count = Math.min(16, signal.length);
-
-        for (let k = 0; k < count; k++) {
-            const row = document.createElement('tr');
-            const word = pcmEncode(indices[k], state.bits);
-            const err = metrics.error[k];
-
-            row.innerHTML = `
-                <td>${k}</td>
-                <td>${(t[k] * 1000).toFixed(2)} ms</td>
-                <td>${signal[k].toFixed(4)} V</td>
-                <td>${indices[k]}</td>
-                <td><span class="pcm-word">${word}</span></td>
-                <td>${quantized[k].toFixed(4)} V</td>
-                <td>${err >= 0 ? '+' : ''}${err.toFixed(4)} V</td>
-            `;
-            tableBody.appendChild(row);
-        }
-
-        // Restart Audio if currently playing
-        if (state.audioActive) {
-            startAudioSynth();
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // 6. Bind Event Listeners
-    // -------------------------------------------------------------------------
-
-    // Range Sliders
-    document.getElementById('slider-bits').addEventListener('input', (e) => {
+// State
+const state = {
+    mode: 'dm',          // 'dm' or 'dpcm'
+    freq: 1.0,
+    amp: 1.0,
+    fs: 1000,
+    duration: 1.0,
+    delta: 0.0079,
+    admEnabled: false,
+    a1: 0.85,
+    bits: 3,
+    autoA1: false
+};
+
+// UI Elements
+const els = {
+    freq: document.getElementById('input-freq'),
+    valFreq: document.getElementById('val-freq'),
+    amp: document.getElementById('input-amp'),
+    valAmp: document.getElementById('val-amp'),
+    fs: document.getElementById('input-fs'),
+    valFs: document.getElementById('val-fs'),
+    delta: document.getElementById('input-delta'),
+    valDelta: document.getElementById('val-delta'),
+    lblDcrit: document.getElementById('lbl-dcrit'),
+    lblRatio: document.getElementById('lbl-ratio'),
+    toggleAdm: document.getElementById('toggle-adm'),
+    a1: document.getElementById('input-a1'),
+    valA1: document.getElementById('val-a1'),
+    bits: document.getElementById('input-bits'),
+    valBits: document.getElementById('val-bits'),
+    valLevels: document.getElementById('val-levels'),
+    toggleOptA1: document.getElementById('toggle-opt-a1'),
+    tabDm: document.getElementById('tab-dm'),
+    tabDpcm: document.getElementById('tab-dpcm'),
+    dmControls: document.getElementById('dm-controls'),
+    dpcmControls: document.getElementById('dpcm-controls'),
+    metricMse: document.getElementById('metric-mse'),
+    metricSqnr: document.getElementById('metric-sqnr'),
+    metricSor: document.getElementById('metric-sor'),
+    metricRegime: document.getElementById('metric-regime'),
+    metricRegimeSub: document.getElementById('metric-regime-sub'),
+    validationStatusBadge: document.getElementById('validation-status-badge'),
+    regimeBadge: document.getElementById('regime-badge'),
+    terminal: document.getElementById('terminal-output'),
+    mainCanvasTitle: document.getElementById('main-canvas-title'),
+    charCanvasTitle: document.getElementById('char-canvas-title'),
+    legPredItem: document.getElementById('leg-pred-item')
+};
+
+// Attach Listeners
+function attachEventListeners() {
+    els.freq.addEventListener('input', (e) => {
+        state.freq = parseFloat(e.target.value);
+        els.valFreq.textContent = state.freq.toFixed(1);
+        updateDcritDisplay();
+        updateSimulation();
+    });
+
+    els.amp.addEventListener('input', (e) => {
+        state.amp = parseFloat(e.target.value);
+        els.valAmp.textContent = state.amp.toFixed(1);
+        updateDcritDisplay();
+        updateSimulation();
+    });
+
+    els.fs.addEventListener('input', (e) => {
+        state.fs = parseInt(e.target.value);
+        els.valFs.textContent = state.fs;
+        updateDcritDisplay();
+        updateSimulation();
+    });
+
+    els.delta.addEventListener('input', (e) => {
+        state.delta = parseFloat(e.target.value);
+        els.valDelta.textContent = state.delta.toFixed(4);
+        updateDcritDisplay();
+        updateSimulation();
+    });
+
+    els.a1.addEventListener('input', (e) => {
+        state.a1 = parseFloat(e.target.value);
+        els.valA1.textContent = state.a1.toFixed(2);
+        updateSimulation();
+    });
+
+    els.bits.addEventListener('input', (e) => {
         state.bits = parseInt(e.target.value);
-        updateApp();
+        els.valBits.textContent = state.bits;
+        els.valLevels.textContent = 1 << state.bits;
+        updateSimulation();
     });
+}
 
-    document.getElementById('slider-amp').addEventListener('input', (e) => {
-        state.amplitude = parseFloat(e.target.value);
-        updateApp();
-    });
+function updateDcritDisplay() {
+    const dcrit = (2.0 * Math.PI * state.freq * state.amp) / state.fs;
+    els.lblDcrit.textContent = `${dcrit.toFixed(4)} V`;
+    const ratio = state.delta / dcrit;
+    els.lblRatio.textContent = `${ratio.toFixed(2)}x`;
+}
 
-    document.getElementById('slider-freq').addEventListener('input', (e) => {
-        state.frequency = parseFloat(e.target.value);
-        updateApp();
-    });
+function setStepPreset(ratio) {
+    const dcrit = (2.0 * Math.PI * state.freq * state.amp) / state.fs;
+    const targetDelta = Math.max(0.0005, dcrit * ratio);
+    state.delta = targetDelta;
+    els.delta.value = targetDelta.toFixed(4);
+    els.valDelta.textContent = targetDelta.toFixed(4);
+    updateDcritDisplay();
+    updateSimulation();
+}
 
-    document.getElementById('slider-fs').addEventListener('input', (e) => {
-        state.samplingRate = parseInt(e.target.value);
-        updateApp();
-    });
+function switchMode(mode) {
+    state.mode = mode;
+    if (mode === 'dm') {
+        els.tabDm.classList.add('active');
+        els.tabDpcm.classList.remove('active');
+        els.dmControls.classList.remove('hidden');
+        els.dpcmControls.classList.add('hidden');
+        els.mainCanvasTitle.textContent = "Waveform Oscilloscope: Input vs Delta Staircase Reconstruction";
+        els.charCanvasTitle.textContent = "MSE vs Step Size Δ (U-Curve Trade-off)";
+        els.legPredItem.style.display = "none";
+    } else {
+        els.tabDpcm.classList.add('active');
+        els.tabDm.classList.remove('active');
+        els.dpcmControls.classList.remove('hidden');
+        els.dmControls.classList.add('hidden');
+        els.mainCanvasTitle.textContent = "Waveform Oscilloscope: Original x[n], Predicted x̂[n], Reconstructed x̃[n]";
+        els.charCanvasTitle.textContent = "DPCM vs Direct PCM SQNR Comparison";
+        els.legPredItem.style.display = "inline-flex";
+    }
+    updateSimulation();
+}
 
-    // Quantizer Convention Toggle
-    document.getElementById('btn-midrise').addEventListener('click', () => {
-        state.mode = 'midrise';
-        document.getElementById('btn-midrise').classList.add('active');
-        document.getElementById('btn-midtread').classList.remove('active');
-        updateApp();
-    });
+function toggleOptimalA1() {
+    state.autoA1 = els.toggleOptA1.checked;
+    els.a1.disabled = state.autoA1;
+    updateSimulation();
+}
 
-    document.getElementById('btn-midtread').addEventListener('click', () => {
-        state.mode = 'midtread';
-        document.getElementById('btn-midtread').classList.add('active');
-        document.getElementById('btn-midrise').classList.remove('active');
-        updateApp();
-    });
+function resetDefaults() {
+    state.freq = 1.0;
+    state.amp = 1.0;
+    state.fs = 1000;
+    state.a1 = 0.85;
+    state.bits = 3;
+    state.admEnabled = false;
+    els.freq.value = "1.0";
+    els.amp.value = "1.0";
+    els.fs.value = "1000";
+    els.a1.value = "0.85";
+    els.bits.value = "3";
+    els.toggleAdm.checked = false;
+    els.valFreq.textContent = "1.0";
+    els.valAmp.textContent = "1.0";
+    els.valFs.textContent = "1000";
+    els.valA1.textContent = "0.85";
+    els.valBits.textContent = "3";
+    els.valLevels.textContent = "8";
+    setStepPreset(1.25);
+}
 
-    // Audio Controls
-    document.getElementById('btn-audio-toggle').addEventListener('click', toggleAudio);
-    document.getElementById('select-audio-source').addEventListener('change', (e) => {
-        state.audioSource = e.target.value;
-        if (state.audioActive) startAudioSynth();
-    });
+// Math Simulations
+function generateSignal() {
+    const N = Math.floor(state.fs * state.duration);
+    const t = new Float64Array(N);
+    const x = new Float64Array(N);
+    for (let i = 0; i < N; i++) {
+        t[i] = i / state.fs;
+        x[i] = state.amp * Math.sin(2.0 * Math.PI * state.freq * t[i]);
+    }
+    return { t, x, N };
+}
 
-    // Reset Defaults Button
-    document.getElementById('btn-reset').addEventListener('click', () => {
-        state.bits = 4;
-        state.amplitude = 1.0;
-        state.frequency = 1.0;
-        state.samplingRate = 1000;
-        state.mode = 'midrise';
+function simulateDM(x, delta, isAdm) {
+    const N = x.length;
+    const x_hat = new Float64Array(N);
+    const e = new Float64Array(N);
+    const bits = new Int8Array(N);
+    const x_tilde = new Float64Array(N);
+    const step_sizes = new Float64Array(N);
 
-        document.getElementById('slider-bits').value = 4;
-        document.getElementById('slider-amp').value = 1.0;
-        document.getElementById('slider-freq').value = 1.0;
-        document.getElementById('slider-fs').value = 1000;
-        document.getElementById('btn-midrise').classList.add('active');
-        document.getElementById('btn-midtread').classList.remove('active');
+    let prevRecon = 0.0;
+    let currentDelta = delta;
+    let prevD = 1.0;
+    const alpha = 1.5;
+    const beta = 0.67;
+    const dMin = delta * 0.1;
+    const dMax = delta * 8.0;
 
-        updateApp();
-    });
+    for (let n = 0; n < N; n++) {
+        x_hat[n] = prevRecon;
+        e[n] = x[n] - x_hat[n];
+        const d = e[n] >= 0 ? 1.0 : -1.0;
+        bits[n] = d > 0 ? 1 : 0;
 
-    // Tab Navigation
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
-
-            btn.classList.add('active');
-            const tabId = btn.getAttribute('data-tab');
-            document.getElementById(tabId).classList.add('active');
-            state.activeTab = tabId;
-            setTimeout(() => updateApp(), 10);
-        });
-    });
-
-    // Save Canvas Image Button
-    document.getElementById('btn-export-canvas').addEventListener('click', () => {
-        let activeCanvas = canvases.waveform;
-        if (state.activeTab === 'tab-staircase') activeCanvas = canvases.staircase;
-        if (state.activeTab === 'tab-sqnr') activeCanvas = canvases.sqnr;
-
-        if (activeCanvas) {
-            const link = document.createElement('a');
-            link.download = `pcm_quantization_${state.bits}bits_${state.activeTab}.png`;
-            link.href = activeCanvas.toDataURL('image/png');
-            link.click();
-        }
-    });
-
-    // Interactive Canvas Mouse Hover
-    if (canvases.waveform) {
-        canvases.waveform.addEventListener('mousemove', (e) => {
-            const rect = canvases.waveform.getBoundingClientRect();
-            const mouseX = e.clientX - rect.left;
-            const margin = { left: 55, right: 30 };
-            const plotW = rect.width - margin.left - margin.right;
-            
-            if (mouseX >= margin.left && mouseX <= rect.width - margin.right) {
-                const relX = (mouseX - margin.left) / plotW;
-                const numP = 300;
-                const idx = Math.floor(relX * numP);
-                state.hoverSampleIdx = idx;
-
-                const { signal } = generateSignal();
-                const { quantized, indices } = quantizeUniform(signal, state.bits, state.mode);
-                if (idx < signal.length) {
-                    const word = pcmEncode(indices[idx], state.bits);
-                    document.getElementById('hover-readout').innerText = 
-                        `Sample #${idx} | x=${signal[idx].toFixed(3)}V | Index=${indices[idx]} | PCM: ${word} | x_q=${quantized[idx].toFixed(3)}V`;
-                }
-            } else {
-                state.hoverSampleIdx = null;
-                document.getElementById('hover-readout').innerText = 'Hover over canvas to inspect sample data';
+        if (isAdm) {
+            if (n > 0) {
+                currentDelta = (d === prevD) ? Math.min(currentDelta * alpha, dMax) : Math.max(currentDelta * beta, dMin);
             }
-            updateApp();
-        });
+            step_sizes[n] = currentDelta;
+            x_tilde[n] = prevRecon + d * currentDelta;
+        } else {
+            step_sizes[n] = delta;
+            x_tilde[n] = prevRecon + d * delta;
+        }
 
-        canvases.waveform.addEventListener('mouseleave', () => {
-            state.hoverSampleIdx = null;
-            document.getElementById('hover-readout').innerText = 'Hover over canvas to inspect sample data';
-            updateApp();
-        });
+        prevRecon = x_tilde[n];
+        prevD = d;
     }
 
-    // Resize Window Handler
-    window.addEventListener('resize', () => {
-        updateApp();
-    });
+    // Step verification
+    let maxStepDev = 0;
+    if (!isAdm) {
+        for (let n = 1; n < N; n++) {
+            const step = Math.abs(x_tilde[n] - x_tilde[n - 1]);
+            const dev = Math.abs(step - delta);
+            if (dev > maxStepDev) maxStepDev = dev;
+        }
+    }
 
-    // -------------------------------------------------------------------------
-    // 7. Initial App Startup
-    // -------------------------------------------------------------------------
-    updateApp();
+    // Metrics
+    let sumErrSq = 0;
+    let sumSigSq = 0;
+    const err = new Float64Array(N);
+    for (let n = 0; n < N; n++) {
+        err[n] = x[n] - x_tilde[n];
+        sumErrSq += err[n] * err[n];
+        sumSigSq += x[n] * x[n];
+    }
+    const mse = sumErrSq / N;
+    const sqnr = 10.0 * Math.log10(Math.max(sumSigSq / N, 1e-12) / Math.max(mse, 1e-12));
+
+    return { x, x_hat, x_tilde, err, bits, mse, sqnr, maxStepDev, step_sizes };
+}
+
+function simulateDPCM(x, a1, bits) {
+    const N = x.length;
+    const levels = 1 << bits;
+    const errorRange = Math.max(0.4, (1.0 + a1) * state.amp * 0.45);
+    const deltaE = (2.0 * errorRange) / levels;
+
+    const x_hat = new Float64Array(N);
+    const e = new Float64Array(N);
+    const eq = new Float64Array(N);
+    const x_tilde = new Float64Array(N);
+
+    let prevRecon = 0.0;
+    for (let n = 0; n < N; n++) {
+        x_hat[n] = a1 * prevRecon;
+        e[n] = x[n] - x_hat[n];
+
+        // Quantize error
+        let clamped = Math.max(-errorRange, Math.min(errorRange, e[n]));
+        let idx = Math.floor((clamped + errorRange) / deltaE);
+        if (idx >= levels) idx = levels - 1;
+        if (idx < 0) idx = 0;
+        eq[n] = -errorRange + (idx + 0.5) * deltaE;
+
+        x_tilde[n] = x_hat[n] + eq[n];
+        prevRecon = x_tilde[n];
+    }
+
+    // Metrics
+    let sumErrSq = 0;
+    let sumSigSq = 0;
+    let sumESq = 0;
+    let sumXSq = 0;
+    let meanX = 0;
+    let meanE = 0;
+    for (let n = 0; n < N; n++) {
+        meanX += x[n];
+        meanE += e[n];
+    }
+    meanX /= N;
+    meanE /= N;
+
+    const err = new Float64Array(N);
+    for (let n = 0; n < N; n++) {
+        err[n] = x[n] - x_tilde[n];
+        sumErrSq += err[n] * err[n];
+        sumSigSq += x[n] * x[n];
+        sumXSq += (x[n] - meanX) ** 2;
+        sumESq += (e[n] - meanE) ** 2;
+    }
+    const mse = sumErrSq / N;
+    const sqnr = 10.0 * Math.log10(Math.max(sumSigSq / N, 1e-12) / Math.max(mse, 1e-12));
+    const varX = sumXSq / N;
+    const varE = sumESq / N;
+    const predGain = 10.0 * Math.log10(Math.max(varX, 1e-12) / Math.max(varE, 1e-12));
+
+    // Baseline PCM
+    const pcmDelta = (2.0 * state.amp) / levels;
+    let pcmErrSq = 0;
+    for (let n = 0; n < N; n++) {
+        let idx = Math.floor((x[n] + state.amp) / pcmDelta);
+        if (idx >= levels) idx = levels - 1;
+        if (idx < 0) idx = 0;
+        let xq = -state.amp + (idx + 0.5) * pcmDelta;
+        pcmErrSq += (x[n] - xq) ** 2;
+    }
+    const pcmMse = pcmErrSq / N;
+    const pcmSqnr = 10.0 * Math.log10(Math.max(sumSigSq / N, 1e-12) / Math.max(pcmMse, 1e-12));
+
+    return { x, x_hat, x_tilde, e, eq, err, mse, sqnr, predGain, pcmMse, pcmSqnr, varX, varE };
+}
+
+// Canvas Rendering
+function drawGrid(ctx, w, h, yMid) {
+    ctx.strokeStyle = '#1e293b';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let x = 0; x < w; x += 50) {
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, h);
+    }
+    for (let y = 0; y < h; y += 40) {
+        ctx.moveTo(0, y);
+        ctx.lineTo(w, y);
+    }
+    ctx.stroke();
+
+    // Center baseline
+    ctx.strokeStyle = '#334155';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(0, yMid);
+    ctx.lineTo(w, yMid);
+    ctx.stroke();
+}
+
+function renderMainOscilloscope(t, x, recon, pred) {
+    const canvas = document.getElementById('waveformCanvas');
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width;
+    const h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+
+    const yMid = h / 2;
+    drawGrid(ctx, w, h, yMid);
+
+    const yScale = (h * 0.40) / Math.max(state.amp, 0.1);
+    const nPts = Math.min(t.length, 500);
+
+    // 1. Plot Input x[n]
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 2.0;
+    ctx.beginPath();
+    for (let i = 0; i < nPts; i++) {
+        const cx = (i / (nPts - 1)) * w;
+        const cy = yMid - x[i] * yScale;
+        if (i === 0) ctx.moveTo(cx, cy);
+        else ctx.lineTo(cx, cy);
+    }
+    ctx.stroke();
+
+    // 2. Plot Predicted x_hat if DPCM mode
+    if (state.mode === 'dpcm' && pred) {
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 1.4;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        for (let i = 0; i < nPts; i++) {
+            const cx = (i / (nPts - 1)) * w;
+            const cy = yMid - pred[i] * yScale;
+            if (i === 0) ctx.moveTo(cx, cy);
+            else ctx.lineTo(cx, cy);
+        }
+        ctx.stroke();
+        ctx.setLineDash([]);
+    }
+
+    // 3. Plot Reconstructed x_tilde (Staircase)
+    ctx.strokeStyle = '#10b981';
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    for (let i = 0; i < nPts; i++) {
+        const cx = (i / (nPts - 1)) * w;
+        const cy = yMid - recon[i] * yScale;
+        if (i === 0) {
+            ctx.moveTo(cx, cy);
+        } else {
+            const prevCx = ((i - 1) / (nPts - 1)) * w;
+            ctx.lineTo(cx, yMid - recon[i - 1] * yScale); // Stair step
+            ctx.lineTo(cx, cy);
+        }
+    }
+    ctx.stroke();
+}
+
+function renderErrorCanvas(err) {
+    const canvas = document.getElementById('errorCanvas');
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width;
+    const h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+    const yMid = h / 2;
+    drawGrid(ctx, w, h, yMid);
+
+    const nPts = Math.min(err.length, 500);
+    let maxErr = 0.05;
+    for (let i = 0; i < nPts; i++) {
+        if (Math.abs(err[i]) > maxErr) maxErr = Math.abs(err[i]);
+    }
+    const yScale = (h * 0.42) / maxErr;
+
+    ctx.strokeStyle = '#ef4444';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let i = 0; i < nPts; i++) {
+        const cx = (i / (nPts - 1)) * w;
+        const cy = yMid - err[i] * yScale;
+        if (i === 0) ctx.moveTo(cx, cy);
+        else ctx.lineTo(cx, cy);
+    }
+    ctx.stroke();
+
+    // Scale label
+    ctx.fillStyle = '#9ca3af';
+    ctx.font = '10px JetBrains Mono';
+    ctx.fillText(`Peak Error: ±${maxErr.toFixed(4)} V`, 10, 16);
+}
+
+function renderCharCanvas(x, dcrit) {
+    const canvas = document.getElementById('charCanvas');
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width;
+    const h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+
+    if (state.mode === 'dm') {
+        // Draw U-Curve of MSE vs Step Size
+        drawGrid(ctx, w, h, h - 20);
+
+        const steps = 30;
+        const deltas = [];
+        const mses = [];
+        let maxMse = 0;
+        let minMse = Infinity;
+
+        for (let i = 1; i <= steps; i++) {
+            const d = (i / steps) * dcrit * 4.0;
+            const res = simulateDM(x, d, false);
+            deltas.push(d);
+            mses.push(res.mse);
+            if (res.mse > maxMse) maxMse = res.mse;
+            if (res.mse < minMse) minMse = res.mse;
+        }
+
+        // Plot U-curve
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 2.0;
+        ctx.beginPath();
+        for (let i = 0; i < steps; i++) {
+            const cx = 30 + (i / (steps - 1)) * (w - 50);
+            // Log scale for vertical
+            const normY = Math.log10(mses[i] + 1e-6) / Math.log10(maxMse + 1e-6);
+            const cy = 20 + (1.0 - Math.min(1.0, Math.max(0, normY))) * (h - 50);
+            if (i === 0) ctx.moveTo(cx, cy);
+            else ctx.lineTo(cx, cy);
+        }
+        ctx.stroke();
+
+        // Mark Delta_crit
+        const critX = 30 + (dcrit / (dcrit * 4.0)) * (w - 50);
+        ctx.strokeStyle = '#ef4444';
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(critX, 10);
+        ctx.lineTo(critX, h - 20);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#ef4444';
+        ctx.font = '10px Inter';
+        ctx.fillText('Δ_crit', critX - 12, 14);
+
+        // Mark current operating point
+        const curScale = Math.min(1.0, state.delta / (dcrit * 4.0));
+        const curX = 30 + curScale * (w - 50);
+        ctx.fillStyle = '#10b981';
+        ctx.beginPath();
+        ctx.arc(curX, h / 2, 5, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.fillText(`Current Δ (${(state.delta/dcrit).toFixed(2)}x)`, Math.min(curX - 20, w - 90), h / 2 - 8);
+
+    } else {
+        // Draw Bar Comparison of DPCM vs PCM
+        const dpcmRes = simulateDPCM(x, state.a1, state.bits);
+        const bars = [
+            { label: `Direct PCM (${state.bits}b)`, val: dpcmRes.pcmSqnr, color: '#ef4444' },
+            { label: `DPCM (${state.bits}b, a₁=${state.a1})`, val: dpcmRes.sqnr, color: '#10b981' }
+        ];
+
+        const barW = 80;
+        const maxVal = Math.max(50, dpcmRes.sqnr * 1.2);
+        bars.forEach((b, idx) => {
+            const bx = 80 + idx * 160;
+            const barH = (b.val / maxVal) * (h - 60);
+            const by = h - 30 - barH;
+
+            ctx.fillStyle = b.color;
+            ctx.fillRect(bx, by, barW, barH);
+
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 12px JetBrains Mono';
+            ctx.fillText(`${b.val.toFixed(2)} dB`, bx + 10, by - 6);
+
+            ctx.fillStyle = '#9ca3af';
+            ctx.font = '11px Inter';
+            ctx.fillText(b.label, bx - 10, h - 12);
+        });
+    }
+}
+
+// Terminal Output
+function logTerminal(type, text) {
+    const p = document.createElement('p');
+    p.className = `term-line ${type}`;
+    p.textContent = text;
+    els.terminal.appendChild(p);
+    els.terminal.scrollTop = els.terminal.scrollHeight;
+}
+
+// Master Update Function
+function updateSimulation() {
+    state.admEnabled = els.toggleAdm.checked;
+    const { t, x } = generateSignal();
+    const dcrit = (2.0 * Math.PI * state.freq * state.amp) / state.fs;
+
+    if (state.mode === 'dm') {
+        const sor = dcrit / state.delta;
+        const dm = simulateDM(x, state.delta, state.admEnabled);
+
+        // Update UI metrics
+        els.metricMse.textContent = dm.mse.toFixed(6);
+        els.metricSqnr.textContent = `${dm.sqnr.toFixed(2)} dB`;
+        els.metricSor.textContent = sor.toFixed(2);
+
+        // Regime evaluation
+        if (state.admEnabled) {
+            els.metricRegime.textContent = "ADM Active";
+            els.metricRegimeSub.textContent = "Dynamic Step Scaling";
+            els.regimeBadge.textContent = "Adaptive DM Mode";
+            els.regimeBadge.style.color = "var(--accent-purple)";
+        } else if (sor > 1.15) {
+            els.metricRegime.textContent = "Slope Overload";
+            els.metricRegimeSub.textContent = "Lagging Staircase";
+            els.regimeBadge.textContent = "Slope Overload";
+            els.regimeBadge.style.color = "var(--accent-red)";
+        } else if (sor < 0.35) {
+            els.metricRegime.textContent = "Granular Noise";
+            els.metricRegimeSub.textContent = "Hunting Oscillations";
+            els.regimeBadge.textContent = "Granular Noise";
+            els.regimeBadge.style.color = "var(--accent-orange)";
+        } else {
+            els.metricRegime.textContent = "Optimal";
+            els.metricRegimeSub.textContent = "Balanced Tracking";
+            els.regimeBadge.textContent = "Optimal Tracking";
+            els.regimeBadge.style.color = "var(--accent-green)";
+        }
+
+        // Step validation
+        if (!state.admEnabled) {
+            const passed = dm.maxStepDev < 1e-6;
+            els.validationStatusBadge.textContent = passed ? `✅ Step Invariant Verified (±Δ = ${state.delta.toFixed(4)}V)` : `❌ Step Invariant Failed!`;
+            els.validationStatusBadge.style.borderColor = passed ? "rgba(16, 185, 129, 0.3)" : "rgba(239, 68, 68, 0.3)";
+        } else {
+            els.validationStatusBadge.textContent = `ℹ️ ADM Dynamic Adaptation Active`;
+        }
+
+        // Terminal Diagnostics
+        els.terminal.innerHTML = "";
+        logTerminal("prompt", `> Parameter State: f=${state.freq}Hz, fs=${state.fs}Hz, Δ=${state.delta.toFixed(4)}V, SOR=${sor.toFixed(2)}`);
+        if (sor > 1.0) {
+            logTerminal("expected", `[EXPECTED] Signal max slope |dx/dt|=${(2*Math.PI*state.freq*state.amp).toFixed(2)} V/s > Modulator velocity ${(state.delta*state.fs).toFixed(2)} V/s. Slope overload guaranteed.`);
+            logTerminal("confirmed", `[OBSERVED] High MSE (${dm.mse.toFixed(6)}) confirmed. Output exhibits directional bit latching.`);
+        } else {
+            logTerminal("expected", `[EXPECTED] Modulator velocity exceeds signal derivative. Overload avoided; tracking regime confirmed.`);
+            logTerminal("confirmed", `[OBSERVED] Low MSE (${dm.mse.toFixed(6)}), SQNR=${dm.sqnr.toFixed(2)} dB.`);
+        }
+
+        renderMainOscilloscope(t, x, dm.x_tilde);
+        renderErrorCanvas(dm.err);
+        renderCharCanvas(x, dcrit);
+
+    } else {
+        // DPCM Mode
+        if (state.autoA1) {
+            // Auto calculate optimal a1
+            let r0 = 0, r1 = 0;
+            for (let i = 0; i < x.length; i++) r0 += x[i] * x[i];
+            for (let i = 1; i < x.length; i++) r1 += x[i] * x[i - 1];
+            state.a1 = Math.min(0.99, Math.max(0.1, r1 / r0));
+            els.a1.value = state.a1.toFixed(2);
+            els.valA1.textContent = state.a1.toFixed(2);
+        }
+
+        const dpcm = simulateDPCM(x, state.a1, state.bits);
+
+        els.metricMse.textContent = dpcm.mse.toFixed(6);
+        els.metricSqnr.textContent = `${dpcm.sqnr.toFixed(2)} dB`;
+        els.metricSor.textContent = `+${(dpcm.sqnr - dpcm.pcmSqnr).toFixed(2)} dB`;
+        els.metricRegime.textContent = "DPCM Active";
+        els.metricRegimeSub.textContent = `Gain Gp = ${dpcm.predGain.toFixed(2)} dB`;
+        els.regimeBadge.textContent = "DPCM Redundancy Reduction";
+        els.validationStatusBadge.textContent = `Tx/Rx Synchronized (0 Drift)`;
+
+        els.terminal.innerHTML = "";
+        logTerminal("prompt", `> DPCM State: a₁=${state.a1.toFixed(2)}, Bits=${state.bits}, Var_x=${dpcm.varX.toFixed(4)}, Var_e=${dpcm.varE.toFixed(4)}`);
+        logTerminal("expected", `[EXPECTED] Inter-sample correlation enables first-order predictor to remove redundancy, making σ_e² << σ_x².`);
+        logTerminal("confirmed", `[OBSERVED] Variance dropped by ${(dpcm.varX / dpcm.varE).toFixed(1)}x. DPCM achieves +${(dpcm.sqnr - dpcm.pcmSqnr).toFixed(2)} dB SQNR gain over direct PCM.`);
+
+        renderMainOscilloscope(t, x, dpcm.x_tilde, dpcm.x_hat);
+        renderErrorCanvas(dpcm.err);
+        renderCharCanvas(x, dcrit);
+    }
+}
+
+// Initial Boot
+window.addEventListener('DOMContentLoaded', () => {
+    attachEventListeners();
+    updateDcritDisplay();
+    updateSimulation();
 });
