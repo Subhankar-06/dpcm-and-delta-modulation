@@ -1,104 +1,132 @@
-# Two-Tone Signal Sampling, Sinc Reconstruction & Aliasing DSP Suite 🌊
+# Digital Communication Laboratory Suite 🌊
 
 [![Live Demo](https://img.shields.io/badge/Live_Demo-GitHub_Pages-00f2fe?style=for-the-badge&logo=github)](https://subhankar-06.github.io/two-tone-signal-sampling-dsp/)
+[![Tests](https://img.shields.io/badge/Unit_Tests-All%20Passed-10b981?style=for-the-badge&logo=pytest)](dpcm_delta_modulation/tests/)
+[![Python 3.9+](https://img.shields.io/badge/Python-3.9%2B-blue?style=for-the-badge&logo=python)](https://python.org)
 
 🌐 **Live Web Application**: [https://subhankar-06.github.io/two-tone-signal-sampling-dsp/](https://subhankar-06.github.io/two-tone-signal-sampling-dsp/)
 
-An interactive Web Studio and Python DSP simulation suite designed for Digital Communication courses to demonstrate and verify the **Whittaker-Shannon Sampling Theorem**, **Sinc Interpolation**, and **Aliasing Dynamics** for a two-tone signal:
+An integrated, interactive Web Studio and Python DSP simulation suite designed for Digital Communication courses. Combines multiple foundational laboratory experiments into a single unified platform:
 
-$$x(t) = A_1 \sin(2\pi f_1 t) + A_2 \sin(2\pi f_2 t)$$
-
-Default parameters: $f_1 = 5.0 \text{ Hz}$, $f_2 = 12.0 \text{ Hz}$ ($f_{\max} = 12.0 \text{ Hz}$, Nyquist Rate $2f_{\max} = 24.0 \text{ Hz}$).
-
----
-
-## 🌟 Key Features
-
-1. **Decoupled Sampling & Plotting Resolutions**:
-   - **Continuous Plotting Grid ($f_{\text{plot}} = 2000 \text{ Hz}$)**: High-resolution grid simulating true continuous-time analog signals.
-   - **Physical Sampling Rate ($f_s$)**: Discrete physical sampler acquiring samples at $t_n = n/f_s$.
-
-2. **3 Fundamental Sampling Regimes**:
-   - **Above Nyquist ($f_s = 36 \text{ Hz} > 24 \text{ Hz}$)**: Over-sampled regime ($1.50\times$). Perfect Whittaker-Shannon sinc reconstruction ($\text{RMSE} \approx 0$).
-   - **At Nyquist ($f_s = 24 \text{ Hz} = 2f_{\max}$)**: Critical sampling boundary ($1.00\times$). Phase-sensitive critical recovery.
-   - **Below Nyquist ($f_s = 14 \text{ Hz} < 24 \text{ Hz}$)**: Sub-Nyquist regime ($0.58\times$). Aliasing active — the $12.0 \text{ Hz}$ component folds back to $|12 - 14| = \mathbf{2.0 \text{ Hz}}$, creating false low-frequency distortion.
-
-3. **▶ Runnable Animated Oscilloscope Wave**:
-   - 60 FPS real-time traveling wave animation ($t \to t + t_{\text{offset}}$) allowing dynamic observation of wave propagation, discrete stem points, sinc reconstruction, and continuous error signal.
-
-4. **🔊 Web Audio Acoustic Synthesizer**:
-   - Acoustic synthesis using Web Audio API to **listen** to the reference vs reconstructed audio. In sub-Nyquist mode, hear the aliased $2.0 \text{ Hz}$ beat frequency pitch distortion.
-
-5. **📊 Spectral & Error Analytics**:
-   - FFT magnitude spectrum of reference vs reconstructed signal with Hann windowing.
-   - Continuous time-domain reconstruction error $e(t) = x(t) - x_r(t)$.
-   - Real-time RMSE, Signal-to-Distortion Ratio (SDR in dB), and theoretical alias frequency calculator.
+1. **Experiment 4: Uniform Quantization and Pulse Code Modulation (PCM)**
+2. **Experiment 5: Differential PCM (DPCM) & Delta Modulation (DM / ADM)**
+3. **Whittaker-Shannon Sampling Theorem, Sinc Reconstruction & Aliasing**
 
 ---
 
-## 📊 Quantitative Simulation Results
+## 🌟 Interactive Web Platform Overview
 
-| Sampling Regime | Physical Rate ($f_s$) | Nyquist Ratio | Tone 2 ($12\text{Hz}$) Alias | Reconstruction RMSE | SDR (dB) |
-| :--- | :---: | :---: | :---: | :---: | :---: |
-| **Above Nyquist** | **36.0 Hz** | $1.50\times$ | $12.0 \text{ Hz}$ (Preserved) | **0.0470** | **24.51 dB** |
-| **At Nyquist** | **24.0 Hz** | $1.00\times$ | $12.0 \text{ Hz}$ (Preserved) | **0.3831** | **6.29 dB** |
-| **Below Nyquist** | **14.0 Hz** | $0.58\times$ | **$2.0 \text{ Hz}$ (Aliased!)** | **0.5119** | **3.78 dB** |
+The live web application features a **multi-experiment tabbed interface**:
 
----
+- **Exp 4: Uniform Quantization & PCM Studio**:
+  - Interactive mid-rise and mid-tread uniform quantizers across bit depths $n \in \{2, 3, 4, 6, 8\}$.
+  - Empirical vs Theoretical $\text{SQNR} \approx 6.02 n + 1.76 \text{ dB}$ derivation and dynamic verification.
+  - Live PCM binary word inspector table displaying the raw bit stream (`0000` to `1111`).
+  - Error probability density function (PDF) histogram vs ideal uniform distribution $U[-\Delta/2, +\Delta/2]$.
+  - Web Audio acoustic synthesizer to listen to quantization noise.
 
-## 📐 Mathematical Foundations
-
-### Whittaker-Shannon Sinc Interpolation
-$$x_r(t) = \sum_{n=0}^{N-1} x[n] \cdot \operatorname{sinc}\left( \frac{t - n T_s}{T_s} \right)$$
-where $\operatorname{sinc}(u) = \frac{\sin(\pi u)}{\pi u}$.
-
-### Alias Frequency Derivation
-When $f_s < 2f_{\max}$, spectral components fold into $[0, f_s/2]$ via:
-$$f_{\text{alias}} = | f - k \cdot f_s |, \quad k = \operatorname{round}(f / f_s)$$
-For $f_2 = 12 \text{ Hz}$ sampled at $f_s = 14 \text{ Hz}$:
-$$f_{\text{alias}, 2} = | 12 - 1 \times 14 | = 2.0 \text{ Hz}$$
-
----
-
-## 🚀 Quick Start
-
-### Option 1: Web DSP Studio (Interactive Browser UI)
-
-Simply serve `index.html` with any local web server:
-
-```bash
-# Python local server
-python -m http.server 8080
-```
-Open `http://localhost:8080` in your web browser.
-
-### Option 2: Python Script (`lab_script.py`)
-
-Run the standalone Python simulation script using NumPy & Matplotlib:
-
-```bash
-# Install dependencies if needed
-pip install numpy matplotlib
-
-# Execute Python lab simulation
-python lab_script.py
-```
-This generates and saves `sampling_simulation_results.png` directly to your directory.
+- **Exp 5: DPCM & Delta Modulation Studio**:
+  - First-order linear predictor $\hat{x}[n] = a_1 \tilde{x}[n-1]$ with sample redundancy reduction.
+  - Linear Delta Modulation (LDM) with fixed step size $\Delta$, featuring 1-click presets:
+    - **Small Step ($\Delta < \Delta_{\text{crit}}$)**: Visualizing severe **Slope Overload Distortion**.
+    - **Moderate Step ($\Delta \approx \Delta_{\text{crit}}$)**: Demonstrating **Optimal Balanced Tracking**.
+    - **Large Step ($\Delta \gg \Delta_{\text{crit}}$)**: Visualizing **Granular Hunting Noise**.
+  - **Dynamic MSE vs. Step Size U-Curve**: Live real-time tracker displaying the physical trade-off between slope overload and granular noise.
+  - **Adaptive Delta Modulation (ADM)**: Song/Jayant dynamic step scaling toggle.
+  - **Mandatory Step Invariant Validator**: Validates that all output steps change by exactly $\pm\Delta$.
 
 ---
 
-## 📁 Repository Structure
+## 📊 Summary of Quantitative Results
+
+### Experiment 4: Uniform Quantization & PCM
+| Resolution ($n$) | Levels ($L = 2^n$) | Step Size ($\Delta$) | Empirical MSE | Simulated SQNR (dB) | Theoretical SQNR (dB) | Discrepancy |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **2 Bits** | 4 | 0.50000 V | 0.020833 | **13.80 dB** | 13.80 dB | 0.00 dB |
+| **3 Bits** | 8 | 0.25000 V | 0.005208 | **19.82 dB** | 19.82 dB | 0.00 dB |
+| **4 Bits** | 16 | 0.12500 V | 0.001302 | **25.85 dB** | 25.84 dB | +0.01 dB |
+| **6 Bits** | 64 | 0.03125 V | 0.000081 | **37.89 dB** | 37.88 dB | +0.01 dB |
+| **8 Bits** | 256 | 0.00781 V | 0.000005 | **49.93 dB** | 49.92 dB | +0.01 dB |
+
+### Experiment 5: DPCM & Delta Modulation
+| Experiment / Parameter | Operating Regime | Measured MSE | SQNR (dB) | Theoretical Gain / Bound | Key Physical Observation |
+| :--- | :--- | :---: | :---: | :---: | :--- |
+| **DPCM ($a_1 = 0.85, b=3$)** | Redundancy Reduction | **0.003975** | **20.99 dB** | $G_p = +15.21 \text{ dB}$ | Variance reduced by $33\times$; +1.90 dB over PCM |
+| **Direct PCM ($b=3$)** | Direct Quantization | 0.006161 | 19.09 dB | Baseline (0 dB) | Standard uniform quantization noise |
+| **DM: Small Step** ($0.30\Delta_{\text{crit}}$) | **Slope Overload** | 0.365760 | 1.36 dB | $\text{SOR} = 3.33$ | Staircase falls behind signal derivative |
+| **DM: Moderate Step** ($1.25\Delta_{\text{crit}}$) | **Optimal Tracking** | **0.000021** | **43.86 dB** | $\text{SOR} = 0.80$ | Minimal distortion; balanced trade-off |
+| **DM: Large Step** ($5.00\Delta_{\text{crit}}$) | **Granular Noise** | 0.000329 | 31.81 dB | $\text{MSE} \approx \Delta^2/3$ | Rapid hunting oscillations in flat regions |
+| **DM: Rapid Input** ($f = 4.0 \text{ Hz}$) | Severe Overload | 0.373213 | 1.27 dB | $\text{SOR} = 3.20$ | $18,071\times$ higher distortion than slow input |
+| **Adaptive DM (ADM)** | Dynamic Scaling | **0.000033** | **41.87 dB** | Song / Jayant | Eliminates overload while preserving fine steps |
+
+---
+
+## 📁 Repository Organization
 
 ```
-├── index.html                       # Main HTML layout for Web Studio
-├── styles.css                       # Futuristic dark theme design system
-├── app.js                           # DSP Math Engine, Sinc Matrix & Web Audio
-├── lab_script.py                    # Standalone Python lab script
-├── sampling_simulation_results.png  # Generated 3-case simulation plot
-└── README.md                        # Documentation
+├── index.html                           # Unified Laboratory Web Application (Exp 4 & Exp 5)
+├── styles.css                           # Unified CSS styling & glassmorphism theme
+├── app.js                               # Uniform Quantization & PCM DSP Engine
+├── dpcm_app.js                          # DPCM & Delta Modulation DSP Engine
+├── dpcm/                                # Direct standalone route for DPCM studio
+│   ├── index.html
+│   ├── styles.css
+│   └── app.js
+├── dpcm_delta_modulation/               # Experiment 5: Python DSP Package
+│   ├── config.py                        # Signal, predictor & step size configuration
+│   ├── dpcm.py                          # First-order predictor & PCM baseline comparator
+│   ├── delta_modulation.py              # Linear DM, Adaptive DM, and step sweep engine
+│   ├── analysis.py                      # SOR, granular noise bounds, diagnostics
+│   ├── visualization.py                 # Matplotlib 6-figure publication plotting suite
+│   ├── main.py                          # Master CLI lab runner
+│   ├── README.md                        # Experiment 5 comprehensive lab manual
+│   ├── requirements.txt
+│   ├── tests/
+│   │   └── test_dpcm_dm.py              # 8 automated unit tests (unittest)
+│   └── results/
+│       ├── metrics.csv                  # Numerical metrics export
+│       └── figures/                     # 6 generated publication figures (300 DPI)
+├── uniform_quantization_pcm/            # Experiment 4: Python DSP Package
+│   ├── config.py
+│   ├── quantizer.py
+│   ├── pcm.py
+│   ├── analysis.py
+│   ├── visualization.py
+│   ├── main.py
+│   ├── README.md                        # Experiment 4 comprehensive lab manual
+│   ├── requirements.txt
+│   ├── tests/
+│   │   └── test_quantizer.py
+│   └── results/
+└── .github/workflows/
+    └── deploy.yml                       # Automated GitHub Pages deployment workflow
 ```
 
 ---
 
-## 📜 License
-MIT License. Free for educational and laboratory use.
+## 🚀 Execution Guide
+
+### 1. Run Automated Unit Tests
+```powershell
+# Run DPCM & Delta Modulation tests (Exp 5)
+python -m unittest discover -s dpcm_delta_modulation/tests -p "test_*.py" -v
+
+# Run Uniform Quantization & PCM tests (Exp 4)
+python -m unittest discover -s uniform_quantization_pcm/tests -p "test_*.py" -v
+```
+
+### 2. Execute Python Laboratory Simulations
+```powershell
+# Run DPCM & Delta Modulation simulation (generates figures & metrics)
+python dpcm_delta_modulation/main.py
+
+# Run Uniform Quantization & PCM simulation
+python uniform_quantization_pcm/main.py
+```
+
+### 3. Open Interactive Web Studio Locally
+Open `index.html` in any modern web browser or start a local HTTP server:
+```powershell
+python -m http.server 8000
+```
+Then navigate to `http://localhost:8000`.

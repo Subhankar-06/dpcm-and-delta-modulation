@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Uniform Quantization & PCM Web Studio | Digital Communication Lab</title>
+    <title>Digital Communication Laboratory Suite | Quantization, PCM, DPCM & Delta Modulation</title>
     <!-- Fonts & Icons -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500;600&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Custom CSS -->
     <link rel="stylesheet" href="styles.css">
@@ -19,29 +19,41 @@
             <div class="brand">
                 <i class="fa-solid fa-wave-square brand-icon"></i>
                 <div>
-                    <h1>Uniform Quantization & PCM Web Studio</h1>
-                    <p class="subtitle">Digital Communication Laboratory Suite — Signal Quantization & PCM Bitstream Analysis</p>
+                    <h1>Digital Communication Laboratory Suite 🌊</h1>
+                    <p class="subtitle">Unified DSP Simulation Platform — Uniform Quantization, PCM, First-Order DPCM & Delta Modulation</p>
                 </div>
             </div>
             <div class="header-actions">
-                <a href="./dpcm/index.html" class="btn btn-primary" style="background: linear-gradient(135deg, #06b6d4, #3b82f6); color: #fff; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; font-weight: 600;">
-                    <i class="fa-solid fa-chart-line"></i> DPCM & Delta Modulation
-                </a>
                 <button id="btn-audio-toggle" class="btn btn-audio">
                     <i class="fa-solid fa-volume-high"></i> <span id="audio-btn-text">Synthesizer Off</span>
                 </button>
+                <a href="./dpcm_delta_modulation/README.md" target="_blank" class="btn btn-secondary">
+                    <i class="fa-solid fa-book"></i> DPCM Manual
+                </a>
                 <a href="./uniform_quantization_pcm/README.md" target="_blank" class="btn btn-secondary">
-                    <i class="fa-solid fa-book"></i> Lab Report
+                    <i class="fa-solid fa-book"></i> PCM Manual
                 </a>
             </div>
         </header>
 
-        <!-- Main Workspace Layout -->
-        <main class="workspace-grid">
+        <!-- Suite Level Experiment Switcher Tabs -->
+        <nav class="suite-nav-container">
+            <button id="btn-exp-pcm" class="main-suite-tab active" onclick="switchSuiteExperiment('pcm')">
+                <i class="fa-solid fa-layer-group"></i> Exp 4: Uniform Quantization & PCM
+            </button>
+            <button id="btn-exp-dpcm" class="main-suite-tab" onclick="switchSuiteExperiment('dpcm')">
+                <i class="fa-solid fa-chart-line"></i> Exp 5: DPCM & Delta Modulation
+            </button>
+        </nav>
+
+        <!-- ================================================================= -->
+        <!-- WORKSPACE 1: UNIFORM QUANTIZATION & PCM STUDIO                     -->
+        <!-- ================================================================= -->
+        <div id="workspace-pcm" class="main-workspace-tab workspace-grid">
             <!-- Sidebar Controls Panel -->
             <aside class="control-panel card">
                 <div class="panel-header">
-                    <h2><i class="fa-solid fa-sliders"></i> Simulation Parameters</h2>
+                    <h2><i class="fa-solid fa-sliders"></i> PCM Parameters</h2>
                     <button id="btn-reset" class="btn-icon" title="Reset Defaults"><i class="fa-solid fa-rotate-left"></i></button>
                 </div>
 
@@ -61,32 +73,32 @@
 
                 <!-- Control 2: Quantizer Mode -->
                 <div class="control-group">
-                    <label>Quantizer Convention:</label>
-                    <div class="toggle-group">
-                        <button id="btn-midrise" class="btn-toggle active">Mid-Rise (AC)</button>
-                        <button id="btn-midtread" class="btn-toggle">Mid-Tread (Zero)</button>
+                    <label>Quantizer Partitioning:</label>
+                    <div class="toggle-btn-group">
+                        <button id="btn-mode-midrise" class="btn-toggle active" data-mode="midrise">Mid-Rise (Standard)</button>
+                        <button id="btn-mode-midtread" class="btn-toggle" data-mode="midtread">Mid-Tread</button>
                     </div>
                 </div>
 
-                <!-- Control 3: Amplitude A -->
+                <!-- Control 3: Amplitude -->
                 <div class="control-group">
                     <div class="control-label-val">
-                        <label for="slider-amp">Peak Amplitude (<i>A</i>):</label>
-                        <span id="val-amp" class="badge">1.00 V</span>
+                        <label for="slider-amplitude">Peak Amplitude (<i>A</i>):</label>
+                        <span id="val-amplitude" class="badge">1.00 V</span>
                     </div>
-                    <input type="range" id="slider-amp" min="0.1" max="1.0" step="0.05" value="1.00">
+                    <input type="range" id="slider-amplitude" min="0.1" max="1.0" step="0.05" value="1.0">
                 </div>
 
-                <!-- Control 4: Frequency f -->
+                <!-- Control 4: Frequency -->
                 <div class="control-group">
                     <div class="control-label-val">
-                        <label for="slider-freq">Signal Frequency (<i>f</i>):</label>
-                        <span id="val-freq" class="badge">1.0 Hz</span>
+                        <label for="slider-frequency">Frequency (<i>f</i>):</label>
+                        <span id="val-frequency" class="badge">1.00 Hz</span>
                     </div>
-                    <input type="range" id="slider-freq" min="0.5" max="5.0" step="0.1" value="1.0">
+                    <input type="range" id="slider-frequency" min="0.5" max="5.0" step="0.5" value="1.0">
                 </div>
 
-                <!-- Control 5: Sampling Rate fs -->
+                <!-- Control 5: Sampling Rate -->
                 <div class="control-group">
                     <div class="control-label-val">
                         <label for="slider-fs">Sampling Rate (<i>f<sub>s</sub></i>):</label>
@@ -95,94 +107,73 @@
                     <input type="range" id="slider-fs" min="200" max="2000" step="100" value="1000">
                 </div>
 
-                <!-- Control 6: Audio Synthesizer Source -->
-                <div class="control-group">
-                    <label>Acoustic Source Monitor:</label>
-                    <select id="select-audio-source" class="form-select">
-                        <option value="quantized">Quantized Signal (Hear Distortion)</option>
-                        <option value="reference">Reference Continuous Sinusoid</option>
-                        <option value="error">Quantization Error Signal e(t)</option>
-                    </select>
-                </div>
-
-                <!-- Key Mathematical Derivation Card -->
-                <div class="theory-box">
-                    <h3><i class="fa-solid fa-calculator"></i> Theoretical Model</h3>
-                    <div class="theory-eq">SQNR &approx; 6.02<i>n</i> + 1.76 dB</div>
-                    <p class="theory-note">Each additional bit doubles levels (<i>L=2<sup>n</sup></i>), halves step size &Delta;, and improves SQNR by <strong>~6.02 dB</strong>.</p>
+                <!-- Live Theoretical & Empirical Analytics Box -->
+                <div class="analytics-box">
+                    <h3><i class="fa-solid fa-square-root-variable"></i> Real-Time Analytics</h3>
+                    <div class="metric-row">
+                        <span>Levels <i>L = 2<sup>n</sup></i>:</span>
+                        <strong id="metric-levels">16</strong>
+                    </div>
+                    <div class="metric-row">
+                        <span>Step Size &Delta;:</span>
+                        <strong id="metric-step">0.12500 V</strong>
+                    </div>
+                    <div class="metric-row">
+                        <span>Measured MSE:</span>
+                        <strong id="metric-pcm-mse">0.001302</strong>
+                    </div>
+                    <div class="metric-row highlight">
+                        <span>Simulated SQNR:</span>
+                        <strong id="metric-pcm-sqnr">25.85 dB</strong>
+                    </div>
+                    <div class="metric-row">
+                        <span>Theoretical SQNR:</span>
+                        <strong id="metric-theory-sqnr">25.84 dB</strong>
+                    </div>
+                    <div class="metric-row">
+                        <span>Discrepancy (&Delta;):</span>
+                        <strong id="metric-sqnr-diff" class="text-success">+0.01 dB</strong>
+                    </div>
                 </div>
             </aside>
 
-            <!-- Main Display Column -->
-            <section class="main-display">
-                <!-- Metrics Bar Cards -->
-                <div class="metrics-row">
-                    <div class="metric-card">
-                        <span class="metric-title">Quantization Levels (<i>L</i>)</span>
-                        <span id="metric-levels" class="metric-value">16</span>
-                        <span class="metric-sub">L = 2<sup>n</sup></span>
-                    </div>
-                    <div class="metric-card">
-                        <span class="metric-title">Step Size (&Delta;)</span>
-                        <span id="metric-delta" class="metric-value">0.1250 V</span>
-                        <span class="metric-sub">&Delta; = 2 / L</span>
-                    </div>
-                    <div class="metric-card">
-                        <span class="metric-title">Noise Power (<i>P<sub>e</sub></i> / MSE)</span>
-                        <span id="metric-mse" class="metric-value">0.001471</span>
-                        <span class="metric-sub">MSE = &Sigma;e&sup2; / N</span>
-                    </div>
-                    <div class="metric-card highlight">
-                        <span class="metric-title">Simulated SQNR</span>
-                        <span id="metric-sqnr-sim" class="metric-value">25.31 dB</span>
-                        <span id="metric-sqnr-diff" class="metric-sub">Diff: -0.53 dB</span>
-                    </div>
-                    <div class="metric-card">
-                        <span class="metric-title">Theoretical SQNR</span>
-                        <span id="metric-sqnr-th" class="metric-value">25.84 dB</span>
-                        <span class="metric-sub">6.02n + 1.76</span>
-                    </div>
-                    <div class="metric-card">
-                        <span class="metric-title">Theory Agreement</span>
-                        <span id="metric-agreement" class="metric-badge pass">YES</span>
-                        <span class="metric-sub">Tol: &plusmn;1.0 dB</span>
-                    </div>
+            <!-- Main Interactive Canvas & Visualization Area -->
+            <section class="display-panel">
+                <!-- Navigation Tabs for Canvases -->
+                <div class="tab-nav card">
+                    <button class="tab-btn active" data-target="tab-waveform">
+                        <i class="fa-solid fa-chart-line"></i> Analog vs. Quantized
+                    </button>
+                    <button class="tab-btn" data-target="tab-staircase">
+                        <i class="fa-solid fa-stairs"></i> Staircase Characteristic
+                    </button>
+                    <button class="tab-btn" data-target="tab-error">
+                        <i class="fa-solid fa-chart-column"></i> Error & Histogram
+                    </button>
+                    <button class="tab-btn" data-target="tab-sqnr">
+                        <i class="fa-solid fa-arrow-trend-up"></i> 6.02 dB/Bit Law
+                    </button>
                 </div>
 
-                <!-- Tabbed Canvas Visualizer Card -->
-                <div class="visualizer-card card">
-                    <!-- Tab Header -->
-                    <div class="tab-header">
-                        <div class="tabs">
-                            <button class="tab-btn active" data-tab="tab-waveform"><i class="fa-solid fa-chart-line"></i> Original vs Quantized Waveform</button>
-                            <button class="tab-btn" data-tab="tab-staircase"><i class="fa-solid fa-stairs"></i> Staircase Curve (<i>x &rarr; x<sub>q</sub></i>)</button>
-                            <button class="tab-btn" data-tab="tab-error"><i class="fa-solid fa-chart-area"></i> Error & Histogram</button>
-                            <button class="tab-btn" data-tab="tab-sqnr"><i class="fa-solid fa-chart-bar"></i> SQNR vs Bits (6.02 dB/bit)</button>
-                        </div>
-                        <div class="tab-controls">
-                            <button id="btn-export-canvas" class="btn-sm"><i class="fa-solid fa-download"></i> Save Plot</button>
-                        </div>
-                    </div>
-
-                    <!-- Tab Contents -->
-                    <div class="tab-body">
-                        <!-- Tab 1: Waveforms Canvas -->
+                <!-- Canvas Viewports Container -->
+                <div class="canvas-container card">
+                    <div class="tab-content-wrapper">
+                        <!-- Tab 1: Waveform Canvas -->
                         <div id="tab-waveform" class="tab-pane active">
                             <canvas id="canvas-waveform" width="900" height="420"></canvas>
                             <div class="canvas-legend">
-                                <span><span class="legend-dot continuous"></span> Reference Sinusoid x(t)</span>
-                                <span><span class="legend-dot quantized"></span> Quantized Staircase x_q(t)</span>
-                                <span id="hover-readout" class="readout-text">Hover over canvas to inspect sample data</span>
+                                <span><span class="legend-dot analog-line"></span> Original Analog Sinusoid x(t)</span>
+                                <span><span class="legend-dot quantized-line"></span> Quantized Staircase Waveform x_q(t)</span>
+                                <span><span class="legend-dot sample-point"></span> Discrete Sampler Stems</span>
                             </div>
                         </div>
 
-                        <!-- Tab 2: Staircase Canvas -->
+                        <!-- Tab 2: Staircase Characteristic Canvas -->
                         <div id="tab-staircase" class="tab-pane">
                             <canvas id="canvas-staircase" width="900" height="420"></canvas>
                             <div class="canvas-legend">
-                                <span><span class="legend-dot ideal"></span> Ideal Line (x_q = x)</span>
-                                <span><span class="legend-dot staircase"></span> Mid-Rise Transfer Characteristic</span>
-                                <span><span class="legend-dot levels"></span> Quantization Levels q_i</span>
+                                <span><span class="legend-dot theory-line"></span> Ideal Mid-Rise Quantization Characteristic</span>
+                                <span><span class="legend-dot sample-point"></span> Operating Points</span>
                             </div>
                         </div>
 
@@ -237,15 +228,210 @@
                     </div>
                 </div>
             </section>
-        </main>
+        </div>
+
+        <!-- ================================================================= -->
+        <!-- WORKSPACE 2: DPCM & DELTA MODULATION STUDIO                       -->
+        <!-- ================================================================= -->
+        <div id="workspace-dpcm" class="main-workspace-tab dashboard-grid" style="display: none;">
+            <!-- Sidebar: Simulation Controls -->
+            <aside class="control-panel card">
+                <div class="panel-header">
+                    <h2><i class="fa-solid fa-sliders"></i> DPCM & DM Controls</h2>
+                </div>
+
+                <!-- Mode Selector Tabs -->
+                <div class="tab-group">
+                    <button class="tab-btn active" id="tab-dm" onclick="switchMode('dm')">Delta Modulation</button>
+                    <button class="tab-btn" id="tab-dpcm" onclick="switchMode('dpcm')">DPCM Predictor</button>
+                </div>
+
+                <!-- Signal Settings -->
+                <div class="control-section">
+                    <h3>Input Signal Parameters</h3>
+                    
+                    <div class="control-row">
+                        <label for="input-freq">Signal Frequency (f): <span class="val-display" id="val-freq">1.0</span> Hz</label>
+                        <input type="range" id="input-freq" min="0.2" max="5.0" step="0.1" value="1.0">
+                        <div class="slider-ticks">
+                            <span>0.2 Hz (Slow)</span>
+                            <span>5.0 Hz (Rapid)</span>
+                        </div>
+                    </div>
+
+                    <div class="control-row">
+                        <label for="input-amp">Peak Amplitude (A): <span class="val-display" id="val-amp">1.0</span> V</label>
+                        <input type="range" id="input-amp" min="0.2" max="2.0" step="0.1" value="1.0">
+                    </div>
+
+                    <div class="control-row">
+                        <label for="input-fs">Sampling Frequency (fs): <span class="val-display" id="val-fs">1000</span> Hz</label>
+                        <input type="range" id="input-fs" min="200" max="2000" step="100" value="1000">
+                    </div>
+                </div>
+
+                <!-- Delta Modulation Controls (Active in DM mode) -->
+                <div class="control-section" id="dm-controls">
+                    <h3>Delta Modulation Parameters</h3>
+                    
+                    <div class="preset-buttons">
+                        <button class="btn-preset" onclick="setStepPreset(0.30)">Small Step (Overload)</button>
+                        <button class="btn-preset" onclick="setStepPreset(1.25)">Moderate (Optimal)</button>
+                        <button class="btn-preset" onclick="setStepPreset(5.00)">Large Step (Granular)</button>
+                    </div>
+
+                    <div class="control-row">
+                        <label for="input-delta">Step Size (Δ): <span class="val-display" id="val-delta">0.0079</span> V</label>
+                        <input type="range" id="input-delta" min="0.0005" max="0.0500" step="0.0005" value="0.0079">
+                        <div class="slider-helper">
+                            <span>Δ_crit: <b id="lbl-dcrit">0.0063 V</b></span>
+                            <span>Ratio (Δ/Δ_crit): <b id="lbl-ratio">1.25x</b></span>
+                        </div>
+                    </div>
+
+                    <div class="control-row checkbox-row">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="toggle-adm" onchange="updateDPCMSimulation()">
+                            <span class="slider round"></span>
+                        </label>
+                        <span class="toggle-label">Enable Adaptive DM (ADM - Song/Jayant)</span>
+                    </div>
+                </div>
+
+                <!-- DPCM Controls (Active in DPCM mode) -->
+                <div class="control-section hidden" id="dpcm-controls">
+                    <h3>DPCM Predictor Settings</h3>
+
+                    <div class="control-row">
+                        <label for="input-a1">Predictor Coefficient (a₁): <span class="val-display" id="val-a1">0.85</span></label>
+                        <input type="range" id="input-a1" min="0.0" max="0.99" step="0.01" value="0.85">
+                    </div>
+
+                    <div class="control-row">
+                        <label for="input-bits">Quantizer Bit Depth: <span class="val-display" id="val-bits">3</span> Bits (L=<span id="val-levels">8</span>)</label>
+                        <input type="range" id="input-bits" min="1" max="6" step="1" value="3">
+                    </div>
+
+                    <div class="control-row checkbox-row">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="toggle-opt-a1" onchange="toggleOptimalA1()">
+                            <span class="slider round"></span>
+                        </label>
+                        <span class="toggle-label">Auto-calculate Optimal a₁ = Rxx(1)/Rxx(0)</span>
+                    </div>
+                </div>
+
+                <!-- Run / Reset -->
+                <div class="btn-actions">
+                    <button class="btn btn-primary" onclick="updateDPCMSimulation()">Recompute Simulation</button>
+                    <button class="btn btn-secondary" onclick="resetDefaults()">Reset Defaults</button>
+                </div>
+            </aside>
+
+            <!-- Center/Right: Oscilloscope Displays & Analytics -->
+            <section class="display-area">
+                <!-- Live Metrics Bar -->
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-title">Mean Squared Error (MSE)</div>
+                        <div class="metric-val" id="metric-mse">0.000021</div>
+                        <div class="metric-sub" id="metric-mse-sub">Reconstruction Distortion</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-title">Signal-to-Noise (SQNR)</div>
+                        <div class="metric-val" id="metric-sqnr">43.86 dB</div>
+                        <div class="metric-sub" id="metric-sqnr-sub">Fidelity Metric</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-title">Slope Overload Ratio (SOR)</div>
+                        <div class="metric-val" id="metric-sor">0.80</div>
+                        <div class="metric-sub" id="metric-sor-sub">Condition: SOR &gt; 1.0 (Overload)</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-title">Operating Regime</div>
+                        <div class="metric-val" id="metric-regime">Optimal</div>
+                        <div class="metric-sub" id="metric-regime-sub">Balanced Tracking</div>
+                    </div>
+                </div>
+
+                <!-- Primary Waveform Canvas -->
+                <div class="card canvas-card">
+                    <div class="canvas-header">
+                        <h3 id="main-canvas-title">Waveform Oscilloscope: Input vs Delta Staircase Reconstruction</h3>
+                        <div class="legend-badges" id="canvas-legend">
+                            <span class="leg-item"><span class="leg-color leg-blue"></span> Input x[n]</span>
+                            <span class="leg-item"><span class="leg-color leg-green"></span> Reconstructed x̃[n]</span>
+                            <span class="leg-item" id="leg-pred-item"><span class="leg-color leg-orange"></span> Predicted x̂[n]</span>
+                        </div>
+                    </div>
+                    <canvas id="waveformCanvas" width="900" height="320"></canvas>
+                </div>
+
+                <!-- Secondary Canvas: Error Signal & Dynamic Adaptation / U-Curve -->
+                <div class="canvas-split-grid">
+                    <!-- Error Canvas -->
+                    <div class="card canvas-card">
+                        <div class="canvas-header">
+                            <h3 id="error-canvas-title">Reconstruction Error e[n] = x[n] - x̃[n]</h3>
+                        </div>
+                        <canvas id="errorCanvas" width="440" height="220"></canvas>
+                    </div>
+
+                    <!-- Characteristic Curve Canvas (U-Curve in DM mode, PCM vs DPCM in DPCM mode) -->
+                    <div class="card canvas-card">
+                        <div class="canvas-header">
+                            <h3 id="char-canvas-title">MSE vs Step Size Δ (U-Curve Trade-off)</h3>
+                        </div>
+                        <canvas id="charCanvas" width="440" height="220"></canvas>
+                    </div>
+                </div>
+
+                <!-- Diagnostic Interpretation Terminal Panel -->
+                <div class="card terminal-card">
+                    <div class="terminal-header">
+                        <span class="terminal-dot red"></span>
+                        <span class="terminal-dot yellow"></span>
+                        <span class="terminal-dot green"></span>
+                        <span class="terminal-title">Observation & Physical Diagnostic Engine</span>
+                    </div>
+                    <div class="terminal-body" id="terminal-output">
+                        <p class="term-line prompt">&gt; System initialized. Mandatory output step validation running...</p>
+                    </div>
+                </div>
+            </section>
+        </div>
 
         <!-- Footer -->
         <footer class="app-footer">
-            <p>Digital Communication Laboratory Suite — Uniform Quantization & Pulse Code Modulation Web Studio | Built with HTML5 Canvas & Web Audio API</p>
+            <p>Digital Communication Laboratory Suite — Uniform Quantization, PCM, DPCM & Delta Modulation | Built with HTML5 Canvas & Web Audio API</p>
         </footer>
     </div>
 
-    <!-- Custom JavaScript Engine -->
+    <!-- Application Scripts -->
     <script src="app.js"></script>
+    <script src="dpcm_app.js"></script>
+    <script>
+        function switchSuiteExperiment(exp) {
+            const pcmTab = document.getElementById('btn-exp-pcm');
+            const dpcmTab = document.getElementById('btn-exp-dpcm');
+            const pcmWs = document.getElementById('workspace-pcm');
+            const dpcmWs = document.getElementById('workspace-dpcm');
+
+            if (exp === 'pcm') {
+                pcmTab.classList.add('active');
+                dpcmTab.classList.remove('active');
+                pcmWs.style.display = 'grid';
+                dpcmWs.style.display = 'none';
+            } else {
+                dpcmTab.classList.add('active');
+                pcmTab.classList.remove('active');
+                pcmWs.style.display = 'none';
+                dpcmWs.style.display = 'grid';
+                if (typeof window.updateDPCMSimulation === 'function') {
+                    window.updateDPCMSimulation();
+                }
+            }
+        }
+    </script>
 </body>
 </html>
