@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DPCM & Delta Modulation — Digital Communication Laboratory</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="top-header">
+            <div class="header-content">
+                <div class="badge">DIGITAL COMMUNICATION LAB • EXPERIMENT 5</div>
+                <h1>Differential PCM & Delta Modulation Interactive Studio</h1>
+                <p class="subtitle">Linear Prediction Redundancy Reduction, Slope Overload Distortion, Granular Noise & Adaptive Delta Modulation</p>
+            </div>
+            <div class="header-badges" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <a href="../index.html" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); padding: 6px 12px; border-radius: 8px; font-size: 0.8rem; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+                    ⬅ PCM Studio
+                </a>
+                <a href="../dpcm_delta_modulation/README.md" target="_blank" style="background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); padding: 6px 12px; border-radius: 8px; font-size: 0.8rem; font-weight: 600; text-decoration: none;">
+                    📖 Lab Manual
+                </a>
+                <span class="status-badge" id="validation-status-badge">✅ Step Invariant Verified (±Δ)</span>
+                <span class="regime-badge" id="regime-badge">Optimal Tracking</span>
+            </div>
+        </header>
+
+        <!-- Main Workspace Grid -->
+        <main class="dashboard-grid">
+            <!-- Sidebar: Simulation Controls -->
+            <aside class="control-panel card">
+                <h2>Simulation Controls</h2>
+
+                <!-- Mode Selector Tabs -->
+                <div class="tab-group">
+                    <button class="tab-btn active" id="tab-dm" onclick="switchMode('dm')">Delta Modulation</button>
+                    <button class="tab-btn" id="tab-dpcm" onclick="switchMode('dpcm')">DPCM Predictor</button>
+                </div>
+
+                <!-- Signal Settings -->
+                <div class="control-section">
+                    <h3>Input Signal Parameters</h3>
+                    
+                    <div class="control-row">
+                        <label for="input-freq">Signal Frequency (f): <span class="val-display" id="val-freq">1.0</span> Hz</label>
+                        <input type="range" id="input-freq" min="0.2" max="5.0" step="0.1" value="1.0">
+                        <div class="slider-ticks">
+                            <span>0.2 Hz (Slow)</span>
+                            <span>5.0 Hz (Rapid)</span>
+                        </div>
+                    </div>
+
+                    <div class="control-row">
+                        <label for="input-amp">Peak Amplitude (A): <span class="val-display" id="val-amp">1.0</span> V</label>
+                        <input type="range" id="input-amp" min="0.2" max="2.0" step="0.1" value="1.0">
+                    </div>
+
+                    <div class="control-row">
+                        <label for="input-fs">Sampling Frequency (fs): <span class="val-display" id="val-fs">1000</span> Hz</label>
+                        <input type="range" id="input-fs" min="200" max="2000" step="100" value="1000">
+                    </div>
+                </div>
+
+                <!-- Delta Modulation Controls (Active in DM mode) -->
+                <div class="control-section" id="dm-controls">
+                    <h3>Delta Modulation Parameters</h3>
+                    
+                    <div class="preset-buttons">
+                        <button class="btn-preset" onclick="setStepPreset(0.30)">Small Step (Overload)</button>
+                        <button class="btn-preset" onclick="setStepPreset(1.25)">Moderate (Optimal)</button>
+                        <button class="btn-preset" onclick="setStepPreset(5.00)">Large Step (Granular)</button>
+                    </div>
+
+                    <div class="control-row">
+                        <label for="input-delta">Step Size (Δ): <span class="val-display" id="val-delta">0.0079</span> V</label>
+                        <input type="range" id="input-delta" min="0.0005" max="0.0500" step="0.0005" value="0.0079">
+                        <div class="slider-helper">
+                            <span>Δ_crit: <b id="lbl-dcrit">0.0063 V</b></span>
+                            <span>Ratio (Δ/Δ_crit): <b id="lbl-ratio">1.25x</b></span>
+                        </div>
+                    </div>
+
+                    <div class="control-row checkbox-row">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="toggle-adm" onchange="updateSimulation()">
+                            <span class="slider round"></span>
+                        </label>
+                        <span class="toggle-label">Enable Adaptive DM (ADM - Song/Jayant)</span>
+                    </div>
+                </div>
+
+                <!-- DPCM Controls (Active in DPCM mode) -->
+                <div class="control-section hidden" id="dpcm-controls">
+                    <h3>DPCM Predictor Settings</h3>
+
+                    <div class="control-row">
+                        <label for="input-a1">Predictor Coefficient (a₁): <span class="val-display" id="val-a1">0.85</span></label>
+                        <input type="range" id="input-a1" min="0.0" max="0.99" step="0.01" value="0.85">
+                    </div>
+
+                    <div class="control-row">
+                        <label for="input-bits">Quantizer Bit Depth: <span class="val-display" id="val-bits">3</span> Bits (L=<span id="val-levels">8</span>)</label>
+                        <input type="range" id="input-bits" min="1" max="6" step="1" value="3">
+                    </div>
+
+                    <div class="control-row checkbox-row">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="toggle-opt-a1" onchange="toggleOptimalA1()">
+                            <span class="slider round"></span>
+                        </label>
+                        <span class="toggle-label">Auto-calculate Optimal a₁ = Rxx(1)/Rxx(0)</span>
+                    </div>
+                </div>
+
+                <!-- Run / Reset -->
+                <div class="btn-actions">
+                    <button class="btn btn-primary" onclick="updateSimulation()">Recompute Simulation</button>
+                    <button class="btn btn-secondary" onclick="resetDefaults()">Reset Defaults</button>
+                </div>
+            </aside>
+
+            <!-- Center/Right: Oscilloscope Displays & Analytics -->
+            <section class="display-area">
+                <!-- Live Metrics Bar -->
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-title">Mean Squared Error (MSE)</div>
+                        <div class="metric-val" id="metric-mse">0.000021</div>
+                        <div class="metric-sub" id="metric-mse-sub">Reconstruction Distortion</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-title">Signal-to-Noise (SQNR)</div>
+                        <div class="metric-val" id="metric-sqnr">43.86 dB</div>
+                        <div class="metric-sub" id="metric-sqnr-sub">Fidelity Metric</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-title">Slope Overload Ratio (SOR)</div>
+                        <div class="metric-val" id="metric-sor">0.80</div>
+                        <div class="metric-sub" id="metric-sor-sub">Condition: SOR &gt; 1.0 (Overload)</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-title">Operating Regime</div>
+                        <div class="metric-val" id="metric-regime">Optimal</div>
+                        <div class="metric-sub" id="metric-regime-sub">Balanced Tracking</div>
+                    </div>
+                </div>
+
+                <!-- Primary Waveform Canvas -->
+                <div class="card canvas-card">
+                    <div class="canvas-header">
+                        <h3 id="main-canvas-title">Waveform Oscilloscope: Input vs Delta Staircase Reconstruction</h3>
+                        <div class="legend-badges" id="canvas-legend">
+                            <span class="leg-item"><span class="leg-color leg-blue"></span> Input x[n]</span>
+                            <span class="leg-item"><span class="leg-color leg-green"></span> Reconstructed x̃[n]</span>
+                            <span class="leg-item" id="leg-pred-item"><span class="leg-color leg-orange"></span> Predicted x̂[n]</span>
+                        </div>
+                    </div>
+                    <canvas id="waveformCanvas" width="900" height="320"></canvas>
+                </div>
+
+                <!-- Secondary Canvas: Error Signal & Dynamic Adaptation / U-Curve -->
+                <div class="canvas-split-grid">
+                    <!-- Error Canvas -->
+                    <div class="card canvas-card">
+                        <div class="canvas-header">
+                            <h3 id="error-canvas-title">Reconstruction Error e[n] = x[n] - x̃[n]</h3>
+                        </div>
+                        <canvas id="errorCanvas" width="440" height="220"></canvas>
+                    </div>
+
+                    <!-- Characteristic Curve Canvas (U-Curve in DM mode, PCM vs DPCM in DPCM mode) -->
+                    <div class="card canvas-card">
+                        <div class="canvas-header">
+                            <h3 id="char-canvas-title">MSE vs Step Size Δ (U-Curve Trade-off)</h3>
+                        </div>
+                        <canvas id="charCanvas" width="440" height="220"></canvas>
+                    </div>
+                </div>
+
+                <!-- Diagnostic Interpretation Terminal Panel -->
+                <div class="card terminal-card">
+                    <div class="terminal-header">
+                        <span class="terminal-dot red"></span>
+                        <span class="terminal-dot yellow"></span>
+                        <span class="terminal-dot green"></span>
+                        <span class="terminal-title">Observation & Physical Diagnostic Engine</span>
+                    </div>
+                    <div class="terminal-body" id="terminal-output">
+                        <p class="term-line prompt">&gt; System initialized. Mandatory output step validation running...</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

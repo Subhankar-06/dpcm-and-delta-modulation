@@ -144,7 +144,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // -------------------------------------------------------------------------
 
     function setupCanvasDPI(canvas) {
-        if (!canvas) return { ctx: null, width: 900, height: 420 };
         const dpr = window.devicePixelRatio || 1;
         const rect = canvas.getBoundingClientRect();
         let w = rect.width;
@@ -165,10 +164,10 @@ document.addEventListener('DOMContentLoaded', () => {
         return { ctx, width: w, height: h };
     }
 
+
     /** Draw Tab 1: Waveforms (Continuous vs Quantized Staircase) */
     function renderWaveformCanvas(t, signal, quantized, bits) {
         const { ctx, width, height } = setupCanvasDPI(canvases.waveform);
-        if (!ctx) return;
         ctx.clearRect(0, 0, width, height);
 
         const margin = { top: 30, right: 30, bottom: 40, left: 55 };
@@ -256,7 +255,6 @@ document.addEventListener('DOMContentLoaded', () => {
     /** Draw Tab 2: Staircase Characteristic (x -> x_q) */
     function renderStaircaseCanvas(bits, mode) {
         const { ctx, width, height } = setupCanvasDPI(canvases.staircase);
-        if (!ctx) return;
         ctx.clearRect(0, 0, width, height);
 
         const margin = { top: 30, right: 30, bottom: 45, left: 55 };
@@ -329,90 +327,82 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderErrorCanvas(t, error, delta) {
         // 1. Error Waveform
         const { ctx: ctxWave, width: wWave, height: hWave } = setupCanvasDPI(canvases.errorWave);
-        if (ctxWave) {
-            ctxWave.clearRect(0, 0, wWave, hWave);
-            
-            const m = { top: 20, right: 20, bottom: 30, left: 45 };
-            const pw = wWave - m.left - m.right;
-            const ph = hWave - m.top - m.bottom;
-            const zeroY = m.top + ph / 2;
+        ctxWave.clearRect(0, 0, wWave, hWave);
+        
+        const m = { top: 20, right: 20, bottom: 30, left: 45 };
+        const pw = wWave - m.left - m.right;
+        const ph = hWave - m.top - m.bottom;
+        const zeroY = m.top + ph / 2;
 
-            ctxWave.strokeStyle = '#1e293b';
-            ctxWave.beginPath();
-            ctxWave.moveTo(m.left, zeroY); ctxWave.lineTo(m.left + pw, zeroY);
-            ctxWave.stroke();
+        ctxWave.strokeStyle = '#1e293b';
+        ctxWave.beginPath();
+        ctxWave.moveTo(m.left, zeroY); ctxWave.lineTo(m.left + pw, zeroY);
+        ctxWave.stroke();
 
-            // Bounds +/- delta/2
-            const mapY = (val) => zeroY - (val / (delta * 0.85)) * (ph / 2);
-            ctxWave.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-            ctxWave.setLineDash([3, 3]);
-            ctxWave.beginPath();
-            ctxWave.moveTo(m.left, mapY(delta / 2)); ctxWave.lineTo(m.left + pw, mapY(delta / 2));
-            ctxWave.moveTo(m.left, mapY(-delta / 2)); ctxWave.lineTo(m.left + pw, mapY(-delta / 2));
-            ctxWave.stroke();
-            ctxWave.setLineDash([]);
+        // Bounds +/- delta/2
+        const mapY = (val) => zeroY - (val / (delta * 0.85)) * (ph / 2);
+        ctxWave.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+        ctxWave.setLineDash([3, 3]);
+        ctxWave.beginPath();
+        ctxWave.moveTo(m.left, mapY(delta / 2)); ctxWave.lineTo(m.left + pw, mapY(delta / 2));
+        ctxWave.moveTo(m.left, mapY(-delta / 2)); ctxWave.lineTo(m.left + pw, mapY(-delta / 2));
+        ctxWave.stroke();
+        ctxWave.setLineDash([]);
 
-            // Error trace
-            const numP = Math.min(error.length, 300);
-            ctxWave.strokeStyle = '#2ecc71';
-            ctxWave.lineWidth = 1.5;
-            ctxWave.beginPath();
-            for (let k = 0; k < numP; k++) {
-                const x = m.left + (k / (numP - 1)) * pw;
-                const y = mapY(error[k]);
-                if (k === 0) ctxWave.moveTo(x, y);
-                else ctxWave.lineTo(x, y);
-            }
-            ctxWave.stroke();
+        // Error trace
+        const numP = Math.min(error.length, 300);
+        ctxWave.strokeStyle = '#2ecc71';
+        ctxWave.lineWidth = 1.5;
+        ctxWave.beginPath();
+        for (let k = 0; k < numP; k++) {
+            const x = m.left + (k / (numP - 1)) * pw;
+            const y = mapY(error[k]);
+            if (k === 0) ctxWave.moveTo(x, y);
+            else ctxWave.lineTo(x, y);
         }
+        ctxWave.stroke();
 
         // 2. Error Histogram
         const { ctx: ctxHist, width: wHist, height: hHist } = setupCanvasDPI(canvases.errorHist);
-        if (ctxHist) {
-            ctxHist.clearRect(0, 0, wHist, hHist);
-            const m = { top: 20, right: 20, bottom: 30, left: 45 };
-            const pw = wHist - m.left - m.right;
-            const ph = hHist - m.top - m.bottom;
+        ctxHist.clearRect(0, 0, wHist, hHist);
 
-            const numBins = 25;
-            const bins = new Int32Array(numBins);
-            const binWidth = delta / numBins;
-            const minE = -delta / 2;
+        const numBins = 25;
+        const bins = new Int32Array(numBins);
+        const binWidth = delta / numBins;
+        const minE = -delta / 2;
 
-            for (let i = 0; i < error.length; i++) {
-                let b = Math.floor((error[i] - minE) / binWidth);
-                if (b < 0) b = 0;
-                if (b >= numBins) b = numBins - 1;
-                bins[b]++;
-            }
-
-            const maxCount = Math.max(...bins, 1);
-            const barW = pw / numBins;
-
-            ctxHist.fillStyle = 'rgba(46, 204, 113, 0.6)';
-            ctxHist.strokeStyle = '#1e293b';
-            for (let b = 0; b < numBins; b++) {
-                const h = (bins[b] / maxCount) * ph;
-                const x = m.left + b * barW;
-                const y = m.top + ph - h;
-                ctxHist.fillRect(x, y, barW - 1, h);
-            }
-
-            // Ideal uniform PDF line
-            ctxHist.strokeStyle = '#e74c3c';
-            ctxHist.lineWidth = 2;
-            const idealY = m.top + ph * 0.25;
-            ctxHist.beginPath();
-            ctxHist.moveTo(m.left, idealY);
-            ctxHist.lineTo(m.left + pw, idealY);
-            ctxHist.stroke();
+        for (let i = 0; i < error.length; i++) {
+            let b = Math.floor((error[i] - minE) / binWidth);
+            if (b < 0) b = 0;
+            if (b >= numBins) b = numBins - 1;
+            bins[b]++;
         }
+
+        const maxCount = Math.max(...bins, 1);
+        const barW = (wHist - m.left - m.right) / numBins;
+
+        ctxHist.fillStyle = 'rgba(46, 204, 113, 0.6)';
+        ctxHist.strokeStyle = '#1e293b';
+        for (let b = 0; b < numBins; b++) {
+            const h = (bins[b] / maxCount) * ph;
+            const x = m.left + b * barW;
+            const y = m.top + ph - h;
+            ctxHist.fillRect(x, y, barW - 1, h);
+        }
+
+        // Ideal uniform PDF line
+        ctxHist.strokeStyle = '#e74c3c';
+        ctxHist.lineWidth = 2;
+        const idealY = m.top + ph * 0.25;
+        ctxHist.beginPath();
+        ctxHist.moveTo(m.left, idealY);
+        ctxHist.lineTo(m.left + pw, idealY);
+        ctxHist.stroke();
     }
 
     /** Draw Tab 4: SQNR vs Bit Depth */
     function renderSQNRCanvas(currentBits) {
         const { ctx, width, height } = setupCanvasDPI(canvases.sqnr);
-        if (!ctx) return;
         ctx.clearRect(0, 0, width, height);
 
         const margin = { top: 30, right: 40, bottom: 45, left: 55 };
@@ -625,6 +615,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+
     // -------------------------------------------------------------------------
     // 6. Bind Event Listeners
     // -------------------------------------------------------------------------
@@ -700,7 +691,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const tabId = btn.getAttribute('data-tab');
             document.getElementById(tabId).classList.add('active');
             state.activeTab = tabId;
-            setTimeout(() => updateApp(), 10);
+            updateApp();
         });
     });
 
@@ -710,48 +701,44 @@ document.addEventListener('DOMContentLoaded', () => {
         if (state.activeTab === 'tab-staircase') activeCanvas = canvases.staircase;
         if (state.activeTab === 'tab-sqnr') activeCanvas = canvases.sqnr;
 
-        if (activeCanvas) {
-            const link = document.createElement('a');
-            link.download = `pcm_quantization_${state.bits}bits_${state.activeTab}.png`;
-            link.href = activeCanvas.toDataURL('image/png');
-            link.click();
-        }
+        const link = document.createElement('a');
+        link.download = `pcm_quantization_${state.bits}bits_${state.activeTab}.png`;
+        link.href = activeCanvas.toDataURL('image/png');
+        link.click();
     });
 
     // Interactive Canvas Mouse Hover
-    if (canvases.waveform) {
-        canvases.waveform.addEventListener('mousemove', (e) => {
-            const rect = canvases.waveform.getBoundingClientRect();
-            const mouseX = e.clientX - rect.left;
-            const margin = { left: 55, right: 30 };
-            const plotW = rect.width - margin.left - margin.right;
-            
-            if (mouseX >= margin.left && mouseX <= rect.width - margin.right) {
-                const relX = (mouseX - margin.left) / plotW;
-                const numP = 300;
-                const idx = Math.floor(relX * numP);
-                state.hoverSampleIdx = idx;
+    canvases.waveform.addEventListener('mousemove', (e) => {
+        const rect = canvases.waveform.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const margin = { left: 55, right: 30 };
+        const plotW = rect.width - margin.left - margin.right;
+        
+        if (mouseX >= margin.left && mouseX <= rect.width - margin.right) {
+            const relX = (mouseX - margin.left) / plotW;
+            const numP = 300;
+            const idx = Math.floor(relX * numP);
+            state.hoverSampleIdx = idx;
 
-                const { signal } = generateSignal();
-                const { quantized, indices } = quantizeUniform(signal, state.bits, state.mode);
-                if (idx < signal.length) {
-                    const word = pcmEncode(indices[idx], state.bits);
-                    document.getElementById('hover-readout').innerText = 
-                        `Sample #${idx} | x=${signal[idx].toFixed(3)}V | Index=${indices[idx]} | PCM: ${word} | x_q=${quantized[idx].toFixed(3)}V`;
-                }
-            } else {
-                state.hoverSampleIdx = null;
-                document.getElementById('hover-readout').innerText = 'Hover over canvas to inspect sample data';
+            const { signal } = generateSignal();
+            const { quantized, indices } = quantizeUniform(signal, state.bits, state.mode);
+            if (idx < signal.length) {
+                const word = pcmEncode(indices[idx], state.bits);
+                document.getElementById('hover-readout').innerText = 
+                    `Sample #${idx} | x=${signal[idx].toFixed(3)}V | Index=${indices[idx]} | PCM: ${word} | x_q=${quantized[idx].toFixed(3)}V`;
             }
-            updateApp();
-        });
-
-        canvases.waveform.addEventListener('mouseleave', () => {
+        } else {
             state.hoverSampleIdx = null;
             document.getElementById('hover-readout').innerText = 'Hover over canvas to inspect sample data';
-            updateApp();
-        });
-    }
+        }
+        updateApp();
+    });
+
+    canvases.waveform.addEventListener('mouseleave', () => {
+        state.hoverSampleIdx = null;
+        document.getElementById('hover-readout').innerText = 'Hover over canvas to inspect sample data';
+        updateApp();
+    });
 
     // Resize Window Handler
     window.addEventListener('resize', () => {
