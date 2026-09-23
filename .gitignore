@@ -10,3 +10,7 @@ __pycache__/
 Thumbs.db
 .git_backup/
 **/.git_backup/
+
+# Standalone Git repositories
+matched-filter-and-eye-diagram/
+pulse-shaping-and-nyquist-criterion/
